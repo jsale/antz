@@ -112,7 +112,7 @@ pNPtextTag npGetTag (int recordID, int tableID, void* dataRef)
 }
 
 //------------------------------------------------------------------------------
-void npSetNodeTag (NPnodePtr node, void* dataRef)
+void npSetNodeTag (pNPnode node, void* dataRef)
 {
 	int i = 0;
 	pNPrecordTag recordTag = NULL;
@@ -153,7 +153,7 @@ void npSetNodeTag (NPnodePtr node, void* dataRef)
 }
 
 //------------------------------------------------------------------------------
-void npTagNode (NPnodePtr node, void* dataRef)
+void npTagNode (pNPnode node, void* dataRef)
 {
 	//if tag is null then allocate memory and init a tag
 	if (node->tag == NULL)
@@ -165,7 +165,7 @@ void npTagNode (NPnodePtr node, void* dataRef)
 	//if no recordID then set the tag title to the nodeID
 	if (node->recordID == 0)
 	{
-		sprintf(node->tag->title, "id: %d", node->id);
+		sprintf (node->tag->title, "id: %d", node->id);
 	}
 	else
 		npSetNodeTag (node, dataRef);
@@ -174,8 +174,8 @@ void npTagNode (NPnodePtr node, void* dataRef)
 }
 
 //------------------------------------------------------------------------------
-void npNodeTraverseTree ( void (*nodeFunc)(NPnodePtr node, void* dataRef), 
-						  NPnodePtr node, void* dataRef)
+void npNodeTraverseTree ( void (*nodeFunc)(pNPnode node, void* dataRef), 
+						  pNPnode node, void* dataRef)
 {
 	int i = 0;
 
@@ -252,12 +252,12 @@ void npDrawTextTag (pNPtextTag tag, void* dataRef)
 
 	//offset for text margin inside the background box
 	glRasterPos2f (5.0f, 6.0f);
-	glutBitmapString (GLUT_BITMAP_9_BY_15, tag->title);
+	npGlutDrawString (GLUT_BITMAP_9_BY_15, tag->title);
 }
 
 //draws the text and optional background box with outline
 //------------------------------------------------------------------------------
-void npDrawNodeTextTag (NPnodePtr node, void* dataRef)
+void npDrawNodeTextTag (pNPnode node, void* dataRef)
 {		
 	int idRed = 0, idGrn = 0, idBlu = 0;
 	pData data = (pData) dataRef;
@@ -299,8 +299,11 @@ void npDrawNodeTextTag (NPnodePtr node, void* dataRef)
 	//either box outline or text drawn the same color as the node, not both
 	if (node->tagMode == kNPtagModeBoxOutlineHUD)
 	{
-		//outline box using node color with fixed 50% opacity
-		glColor4ub(node->color.r, node->color.g, node->color.b, 128);
+		//outline box using node color with fixed 50% opacity, unless HUD item
+		if (node->type == kNodeHUD)
+			glColor4ub(node->color.r, node->color.g, node->color.b, node->color.a);
+		else
+			glColor4ub(node->color.r, node->color.g, node->color.b, 128); //50%
 
 		glBegin (GL_LINE_LOOP);
 			glVertex2f(1.0f, 2.0f);
@@ -319,7 +322,7 @@ void npDrawNodeTextTag (NPnodePtr node, void* dataRef)
 	//offset for text margin inside the background box
 	glRasterPos2f (5.0f, 6.0f);
 	
-	glutBitmapString (GLUT_BITMAP_9_BY_15, tag->title);
+	npGlutDrawString (GLUT_BITMAP_9_BY_15, tag->title);
 }
 
 //Draw the Text Labels (Simple Ring now)
@@ -329,7 +332,7 @@ void npDrawNodeTags (void* dataRef)
 	int i = 0;
 
 	pData data = (pData) npGetDataRef();
-	NPnodePtr node;
+	pNPnode node;
 
 	glPushMatrix();
 
@@ -359,5 +362,16 @@ void npDrawNodeTags (void* dataRef)
 	data->io.gl.hud.tags.count = 0;
 
 	glPopMatrix();
+}
+
+//------------------------------------------------------------------------------
+void npGlutDrawString (void *font, char *str)
+{
+	int i = 0, size = 0;
+	
+	size = strlen (str);
+	
+	for (i=0; i < size; i++)
+		glutBitmapCharacter (font, str[i]);
 }
 

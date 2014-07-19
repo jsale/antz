@@ -65,7 +65,7 @@ FILE* npFileOpen (const char* fileName, const char* mode, void* dataRef)
 {
 	FILE* file = NULL;
 
-	file = fopen(fileName, mode); 
+	file = fopen (fileName, mode); 
 
 	if ( file == NULL )
 	{

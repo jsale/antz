@@ -26,6 +26,7 @@
 
 #include "../npctrl.h"
 #include "../npdata.h"
+#include "../os/npos.h"
 
 #include "npgl.h"
 
@@ -63,9 +64,10 @@ void npInitMouse (void* dataRef)
 	data->io.mouse.z = 0;						//typically the scroll wheel
 
 	data->io.mouse.mode = kNPmouseModeNull;
-//	data->io.mouse.pickMode = kNPpickModeNull;
-	data->io.mouse.pickMode = kNPpickModePin;						//zz debug
-	data->io.mouse.tool = kNPtoolNull;
+//	data->io.mouse.pickMode = kNPmodeNull;
+//	data->io.mouse.pickMode = kNPmodeCamera;
+	data->io.mouse.pickMode = kNPmodePin;	//needs to match npInitTools, zz debug
+	data->io.mouse.tool = kNPtoolCombo;		//needs to match npInitTools, zz debug
 
 	data->io.mouse.buttonL = false;					//true when pressed
 	data->io.mouse.buttonC = false;
@@ -91,6 +93,12 @@ void npInitMouse (void* dataRef)
 	data->io.mouse.deltaSum.z = 0.0f;
 
 	data->io.mouse.pinSelected = false;
+
+	data->io.mouse.createEvent = false;
+	data->io.mouse.singleClick = false;
+	data->io.mouse.doubleClick = false;
+
+	data->io.mouse.linkA = NULL;
 	
 	data->io.mouse.size = sizeof(NPmouse);
 }
@@ -147,6 +155,7 @@ void npUpdateMouse (void* dataRef)
 void npMouseMotion (int x, int y)
 {
 	pData data = (pData) npGetDataRef();
+	static float localSum = 0.0f;
 
 	//deltaSum mouse delta coords
 	data->io.mouse.deltaSum.x += (GLfloat)(x - data->io.mouse.previous.x);
@@ -154,6 +163,20 @@ void npMouseMotion (int x, int y)
 
 	data->io.mouse.previous.x = x;
 	data->io.mouse.previous.y = y;
+
+	// works in conjuction with time based single click to satisfy power users
+	// this is used to detect the difference between a click and drag operation
+	// used by mouse tool Create
+	// we want to see more then a pixel of movement to know the users intention
+	// we square the delta to make the result positive
+	localSum += data->io.mouse.deltaSum.x * data->io.mouse.deltaSum.x
+				+ data->io.mouse.deltaSum.y * data->io.mouse.deltaSum.y;
+	if ( localSum > 20.0f )	//requires about 5 pixels of movement
+	{
+		data->io.mouse.singleClick = false;
+		data->io.mouse.createEvent = 0;			//used for Create tool, //zz-s
+		localSum = 0.0f;
+	}
 }
 
 void npSetCamTarget (void* dataRef)
@@ -163,12 +186,12 @@ void npSetCamTarget (void* dataRef)
 
 	pData data = (pData) dataRef;
 
-	NPnodePtr cam = data->map.activeCam;
-	NPnodePtr node = data->map.node[data->map.selectedPinIndex];
-	NPnodePtr rootGrid = data->map.node[kNPnodeRootGrid];
+	pNPnode cam = data->map.currentCam;
+	pNPnode node = data->map.selectedPinNode; //.node[data->map.selectedPinIndex];
+	pNPnode rootGrid = data->map.node[kNPnodeRootGrid];
 	pNPmouse mouse = (pNPmouse) &data->io.mouse;
 
-	if (mouse->pickMode == kNPpickModeGrid)									//zz debug
+	if (mouse->pickMode == kNPmodeGrid)									//zz debug
 		node = data->map.selectedGrid;
 
 	if (node == NULL)
@@ -176,7 +199,7 @@ void npSetCamTarget (void* dataRef)
 /*
 	mouse->targetDest.x = node->translate.x;
 	mouse->targetDest.y = node->translate.y;
-	mouse->targetDest.z = node->translate.z + kNPpinHeight * node->scale.z;
+	mouse->targetDest.z = node->translate.z + kNPoffsetPin * node->scale.z;
 
 	dX = cam->translate.x - mouse->targetDest.x;
 	dY = cam->translate.y - mouse->targetDest.y;
@@ -202,7 +225,11 @@ void npSetCamTarget (void* dataRef)
 	mouse->targetDest.x = node->translate.x;
 	mouse->targetDest.y = node->translate.y;
 	mouse->targetDest.z = node->translate.z * rootGrid->scale.z 
-						  + kNPpinHeight * node->scale.z;
+						  + kNPoffsetPin * node->scale.z;
+
+	mouse->targetDest.x = node->world.x;
+	mouse->targetDest.y = node->world.y;
+	mouse->targetDest.z = node->world.z;
 
 	dX = cam->translate.x - mouse->targetDest.x;
 	dY = cam->translate.y - mouse->targetDest.y;
@@ -235,20 +262,23 @@ void npSetCamTarget (void* dataRef)
 */
 }
 
-
 //------------------------------------------------------------------------------
 void npMouseEvent (int button, int state, int x, int y)
 {
-	int restoreMode = 0;
-
 	pData data = (pData) npGetDataRef();
-	NPnodePtr cam = data->map.activeCam;
+	pNPnode cam = data->map.currentCam;
 	pNPmouse mouse = &data->io.mouse;
 
+	int restoreMode = 0;
+	static double deltaTimeL = 0.0f, deltaTimeR = 0.0f;
+
+	pNPnode node = NULL;												//zz-s debug
+	char msg[256];
+	char msgPart[256];
 
 	//set previous current positiong and zero out the mouse delta
 	mouse->previous.x = x;
-	mouse->previous.y = y;	
+	mouse->previous.y = y;			//probably causing dual button fly bug, zz debug
 	mouse->delta.x = 0.0f;
 	mouse->delta.y = 0.0f;
 	mouse->cmDX = 0.0f;
@@ -257,33 +287,104 @@ void npMouseEvent (int button, int state, int x, int y)
 	//	glutWarpPointer(150,150);	//debug, zz
 
 
-	//store the mouse button state
+	//store the mouse button state, and detect single click
 	if (button == GLUT_LEFT_BUTTON)
 		if (state == GLUT_DOWN)
+		{
 			mouse->buttonL = true;
+			deltaTimeL = nposGetTime();
+			mouse->singleClick = false;
+		}
 		else
+		{
 			mouse->buttonL = false;
+			if ( (nposGetTime() - deltaTimeL) < kNPsingleClickTime)
+				mouse->singleClick = true;
+		}
 
 	if (button == GLUT_RIGHT_BUTTON)
 		if (state == GLUT_DOWN)
+		{
 			mouse->buttonR = true;
+			deltaTimeR = nposGetTime();
+			mouse->singleClick = false;
+		}
 		else
+		{
 			mouse->buttonR = false;
+			if ( (nposGetTime() - deltaTimeR) < kNPsingleClickTime)
+				mouse->singleClick = true;
+		}
+
 
 	//Pick object if single button down, but not if two buttons pressed
 	if (state == GLUT_DOWN && !(mouse->buttonR && mouse->buttonL) )
 	{
-		//if not in cam mode then do PickPass
-	//	if (mouse->pickMode != kNPpickModeCamera)
-		{
-			npPick (x, data->io.gl.height - y, data); //invert y to screen coord
+		//pick using current mouse position, invert y axis to screen coord
+		npPick (x, data->io.gl.height - y, data);
 
-			//if cam not picked then set cam target to the selected node
-			if (data->io.gl.pickID != 0)
-				npSetCamTarget (data);
-		}
-		if (mouse->pickMode == kNPpickModeCamera)
+		//if cam not picked then set cam target to the selected node
+		if (data->io.gl.pickID != 0)
+			npSetCamTarget (data);
+
+		//if cam mode then set pickID = 0 to maintain cam selection
+		if (mouse->pickMode == kNPmodeCamera)
 			data->io.gl.pickID = 0;
+	}
+
+	//used to create click, but not drag so cam works
+								//all of this should be moved over to npcrtl, or npnode, zz debug
+	if (mouse->singleClick && data->io.mouse.createEvent)
+	{
+		mouse->singleClick = false;
+		data->io.mouse.createEvent = false;
+
+		if (state == GLUT_UP && button == GLUT_LEFT_BUTTON)
+		{	
+		//	data->io.mouse.createEvent = false;
+			//clear the event state
+			if (data->map.currentNode != data->map.selectedPinNode)
+			{
+				node = npNodeNew (kNodePin, NULL, data);					//zz-s debug messy clean this up
+				npNodeNew (node->type, node, data);						//move this to npCtrl.h
+				npSetCamTarget (data);	//sets camera target to selected node
+
+				if (node->type == kNodeGrid)
+					sprintf (msgPart, "New grid ");
+				if (node->type == kNodePin)
+					sprintf (msgPart, "New pin ");
+				sprintf (msg, "%sid: %d   branchLevel: %d", msgPart, node->id, node->branchLevel);
+				npPostMsg (msg, kNPmsgCtrl, data);
+
+				npPostMsg ("Mouse IF", kNPmsgCtrl, data);
+			}
+			else
+			{
+				node = data->map.currentNode;
+
+				if	(node->branchLevel == 0)
+				{
+					node = npNodeNew (node->type, node, data);						//move this to npCtrl.h
+					npSetCamTarget (data);	//sets camera target to selected node
+
+					if (node->type == kNodeGrid)
+						sprintf (msgPart, "New grid ");
+					if (node->type == kNodePin)
+						sprintf (msgPart, "New pin ");
+					sprintf (msg, "%sid: %d   branchLevel: %d", msgPart, node->id, node->branchLevel);
+					npPostMsg (msg, kNPmsgCtrl, data);
+
+					npPostMsg ("Mouse IF", kNPmsgCtrl, data);
+				}
+				else
+					npCtrlCommand (kNPcmdNew, data);	
+			}
+		}
+		else if (state == GLUT_UP && button == GLUT_RIGHT_BUTTON)
+		{
+	//		data->io.mouse.createEvent = false;
+			npCtrlCommand (kNPcmdDelete, data);
+		}
 	}
 
 	//calculate mouse operation mode
@@ -291,7 +392,7 @@ void npMouseEvent (int button, int state, int x, int y)
 	{
 		if (mouse->buttonL && !mouse->buttonR)		//left button
 		{
-			if (mouse->mode != kNPmouseModeCamFlyA)//not in fly mode
+			if (1)//mouse->mode != kNPmouseModeCamFlyA)//not in fly mode
 				mouse->mode = kNPmouseModeCamExamXY;
 			else
 				mouse->mode = kNPmouseModeCamLook;
@@ -299,18 +400,12 @@ void npMouseEvent (int button, int state, int x, int y)
 
 		if (mouse->buttonL && mouse->buttonR)		//both buttons
 		{
-			if (mouse->mode != kNPmouseModeCamFlyA )//not in fly mode
+			if (1)//mouse->mode != kNPmouseModeCamFlyA )//not in fly mode
 				mouse->mode = kNPmouseModeCamExamXZ;
-			else
-				mouse->mode = kNPmouseModeCamLook;
-		}
-
-		//if free fly mode then overide by setting target to current position 
-		//this results in a mouse look mode
-		if (mouse->mode == kNPmouseModeCamLook)
-		{
-										//zz debug jerry-rigged
-			data->io.gl.pickID = 0;
+			
+			npSetCamTarget (data);											//zz-osx
+		//	else
+		//		mouse->mode = kNPmouseModeCamLook;
 		}
 
 		if ( !mouse->buttonL && mouse->buttonR 			//right button
@@ -323,10 +418,10 @@ void npMouseEvent (int button, int state, int x, int y)
 		}
 
 		// select the camera if not selected and button down
-		if (state == GLUT_DOWN && data->map.nodeRootIndex != kNPnodeRootCamera)
+		if (state == GLUT_DOWN && data->map.currentCam != data->map.currentNode) //data->map.nodeRootIndex != kNPnodeRootCamera) //zz debug
 		{
 	//		restoreMode = mouse->pickMode;			//store pickMode	//zz debug
-			npSelectNode (data->map.activeCam, data);		//select camera
+			npSelectNode (data->map.currentCam, data);		//select camera
 	//		mouse->pickMode = restoreMode;			//restore pickMode
 		}
 	}
@@ -343,12 +438,12 @@ void npMouseEvent (int button, int state, int x, int y)
 	// if no buttons then restore selection, state == GLUT_UP
 	if ( !mouse->buttonL && !mouse->buttonR )
 	{	
-		if (data->io.mouse.pickMode != kNPpickModeCamera	//not in cam mode
+		if (data->io.mouse.pickMode != kNPmodeCamera	//not in cam mode
 			&& data->io.gl.pickID == 0)						//but moving a cam
 		{	
 			if (mouse->mode != kNPmouseModeCamFlyA && mouse->mode != kNPmouseModeCamLook )
 			{
-				if (data->io.mouse.pickMode == kNPpickModeGrid)
+				if (data->io.mouse.pickMode == kNPmodeGrid)
 					npCtrlCommand (kNPcmdGrid, data);
 				else 
 					//npCtrlCommand (kNPcmdPin, data);
@@ -365,6 +460,19 @@ void npMouseEvent (int button, int state, int x, int y)
 	}
 }
 
+//using freeglut for the wheel at the moment, not supported by apple glut
+//------------------------------------------------------------------------------
+void npMouseWheel (int wheel, int direction, int x, int y)
+{
+	pData data = (pData) npGetDataRef();
+
+	//inverted direction, this way scrolling down goes down the list
+	if (direction < 0)
+		npCtrlCommand (kNPcmdTool, data);
+	else
+		npCtrlCommand (kNPcmdToolDown, data);
+}
+
 
 //------------------------------------------------------------------------------
 float npLowPassFilter( float start, float target, float fac )
@@ -377,7 +485,7 @@ float npLowPassFilter( float start, float target, float fac )
 NPfloatXYZ lookVec(void* dataRef)
 {
 	pData data = (pData) dataRef;
-	NPnodePtr camNode = data->map.activeCam;
+	pNPnode camNode = data->map.currentCam;
 	
 	NPfloatXYZ look;
 	NPfloatXYZ eCent = data->io.mouse.target; //examinerCenterDest;

@@ -71,7 +71,7 @@ void npInitMap (void* dataRef)
 
 	{ kNPparent,			kNPvoidPtr,		"parent_id",		"parent node in a data tree" },
 	{ kNPbranchLevel,		kNPint,			"branch_level",		"branch depth on tree, 0 is root node" },
-	{ kNPchild,				kNPvoidPtr,		"child_list_id",	"list ID of attached child nodes" },
+	{ kNPchild,				kNPvoidPtr,		"child_id",			"list ID of attached child nodes" },
 	{ kNPchildIndex,		kNPint,			"child_index",		"specifies the current child" }, 
 	{ kNPchildCount,		kNPint,			"child_count",		"current number of children" },
 
@@ -127,7 +127,7 @@ void npInitMap (void* dataRef)
 
 	{ kNPsegments,			kNPintXYZ,		"segments",			"segment count, such as the grid" },
 
-	{ kNPtagMode,			kNPint,			"tag_mode",			"text mode display method" },
+	{ kNPtagMode,			kNPint,			"tag_mode",			"text tag display mode" },
 	{ kNPformatID,			kNPint,			"format_id",		"translates values, used for labels" },
 	{ kNPtableID,			kNPint,			"table_id",			"location of the records source table" },
 	{ kNPrecordID,			kNPint,			"record_id",		"record ID in the source table" },	//debug zz
@@ -151,7 +151,7 @@ void npInitMap (void* dataRef)
 	{ kNPheight,			kNPint,			"height",			"res in pixels" },
 
 	{ kNPfov,				kNPfloat,		"fov",				"FOV 35mm, 70mm..." },
-	{ kNPclipNear,			kNPfloat,		"clip_near",			"camera near clipping plane" },
+	{ kNPclipNear,			kNPfloat,		"clip_near",		"camera near clipping plane" },
 	{ kNPclipFar,			kNPfloat,		"clip_far",			"camera far clipping plane" },
 
 	{ kNPaperture,			kNPfloat,		"aperture",			"F stop" },
@@ -221,11 +221,12 @@ void npInitMap (void* dataRef)
 	data->map.nodeRootCount		= 0;
 	data->map.nodeRootIndex		= 0;
 
-	data->map.activeCam			= NULL;
+	data->map.currentCam		= NULL;
 	data->map.currentNode		= NULL;
 	data->map.selectedGrid		= NULL;
 	data->map.selectedPinNode	= NULL;
 	data->map.selectedPinIndex	= 0;
+	data->map.selectedHUD		= NULL;
 
 	//clear the node ID array
 	data->map.node = (void*) malloc (kNPnodeRootMax * sizeof(void*));
@@ -294,7 +295,7 @@ void npInitMap (void* dataRef)
 }
 
 //------------------------------------------------------------------------------
-int npGetRootIndex (NPnodePtr node, void* dataRef)
+int npGetRootIndex (pNPnode node, void* dataRef)
 {
 	int i = 0;
 	int index = 0;
@@ -315,68 +316,111 @@ int npGetRootIndex (NPnodePtr node, void* dataRef)
 }
 
 //------------------------------------------------------------------------------
-void npSelectNode (NPnodePtr node, void* dataRef)
+void npSelectNode (pNPnode node, void* dataRef)
 {
 	int rootIndex = 0;
 	pData data = (pData) dataRef;
+
+	pNPnode parent = NULL;
+//	char msg[256];																//zz-s
 
 	//return if NULL, not considered an err
 	if (node == NULL)
 	{
-		npPostMsg("Err 6841 - invalid node selected", kNPmsgErr, dataRef);
+		//zz debug, not really an error
+//		npPostMsg("Err 6841 - invalid node selected", kNPmsgErr, dataRef);		//zz-s
 		
 		//select the camera
-		node = data->map.activeCam;
+		node = data->map.currentCam;
 
 		if (node == NULL)
+		{
+			npPostMsg("Err 6841 - currentCam is NULL", kNPmsgErr, dataRef);
 			return;
+		}
 	}
-	
+
+/*	if (node->parent != NULL)													//zz-s	
+	{
+		parent = node->parent;
+		sprintf(msg,"id: %d  type: %d  parent: %d", node->id, node->type, parent->id); 
+	}
+	else
+		sprintf(msg,"node id: %d  type: %d  parent NULL", node->id, node->type); 
+	npPostMsg(msg, kNPmsgErr, dataRef);											//zz-s
+*/	
 	//traverses up the tree to the pin root and gets the pin index
 	rootIndex = npGetRootIndex (node, dataRef);
 
 	//if a pin
-	if (node->type == kNodePin)
-	{
-		data->map.selectedPinIndex = rootIndex;
-		data->map.selectedPinNode = node;
+	switch (node->type)
+	{	
+	//	case kNodeDefault : break;
+		case kNodeCamera :
+			data->map.currentCam = node; 
+			data->map.currentNode = node;
+			data->map.nodeRootIndex = rootIndex;
+			break;
+		case kNodePin :
+		case kNodeLink :
+			data->map.selectedPinIndex = rootIndex;
+			data->map.selectedPinNode = node;
+			data->map.currentNode = node;
+			data->map.nodeRootIndex = rootIndex;
+			break;
+		case kNodeGrid :
+			data->map.selectedGrid = node; 
+			data->map.currentNode = node;
+			data->map.nodeRootIndex = rootIndex;
+			break;
+		case kNodeHUD : data->map.selectedHUD = node; break;
+		default : 
+			npPostMsg("Err 6842 - node type unknown", kNPmsgErr, dataRef);
+			
+			//select the camera
+		/*	rootIndex = 1;
+			node = data->map.currentCam;
+			data->io.mouse.pickMode = kNPmodeCamera;
+			data->map.currentNode = node;
+			data->map.nodeRootIndex = rootIndex;
+		*/
+			break;
 	}
-	else if (node->type == kNodeCamera)
-		data->map.activeCam = node;
-	else if (node->type == kNodeGrid)
-		data->map.selectedGrid = node;
-	else
-	{
-		npPostMsg("activeCam selected", kNPmsgCtrl, dataRef);
-		
-		//select the camera
-		rootIndex = 1;
-		node = data->map.activeCam;
-		data->io.mouse.pickMode = kNPpickModeCamera;
-	}
-
-	data->map.currentNode = node;
-	data->map.nodeRootIndex = rootIndex;
 }
 
 
 //------------------------------------------------------------------------------
-NPnodePtr npMapNodeNext (void* dataRef){return NULL;}			//select next sibling node
-NPnodePtr npMapNodePrevious (void* dataRef){return NULL;}		//previous sibling
-NPnodePtr npMapNodeUp (void* dataRef){return NULL;}				//select parent
-NPnodePtr npMapNodeDown (void* dataRef){return NULL;}			//select 
+pNPnode npMapNodeNext (void* dataRef){return NULL;}			//select next sibling node
+pNPnode npMapNodePrevious (void* dataRef){return NULL;}		//previous sibling
+pNPnode npMapNodeUp (void* dataRef){return NULL;}				//select parent
+pNPnode npMapNodeDown (void* dataRef){return NULL;}			//select 
 
-void npSelectNodeID (int id, void* dataRef)
+//------------------------------------------------------------------------------
+void* npGetNodeByID (int id, void* dataRef)
 {
-	int rootIndex = 0;
 	pData data = (pData) dataRef;
+	pNPnode node = NULL;
+
+	node = data->map.nodeID[id];		//get node by id
+
+	return node;
+}
+
+//------------------------------------------------------------------------------
+void npSelectNodeByID (int id, void* dataRef)
+{
+	pNPnode node = NULL;
+
+	node = npGetNodeByID (id, dataRef);	//get node by id
+
+	npSelectNode (node, dataRef);
 }
 
 
 //applies passed in function to the passed in node and all sub-branches
 //------------------------------------------------------------------------------
-void npTraverseTree (void (*nodeFunc)(NPnodePtr node, void* dataRef), 
-					 NPnodePtr node, void* dataRef)
+void npTraverseTree (void (*nodeFunc)(pNPnode node, void* dataRef), 
+					 pNPnode node, void* dataRef)
 {
 	int i = 0;
 
@@ -395,7 +439,7 @@ void npTraverseTree (void (*nodeFunc)(NPnodePtr node, void* dataRef),
 
 //applies passed in function to all nodes
 //------------------------------------------------------------------------------
-void npTraverseMap (void (*nodeFunc)(NPnodePtr node, void* dataRef),
+void npTraverseMap (void (*nodeFunc)(pNPnode node, void* dataRef),
 				   void* dataRef)
 {
 	int i = 0;

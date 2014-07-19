@@ -34,18 +34,20 @@
 void npInitNode (void* dataRef);
 void npCloseNode (void* dataRef);
 
-void npInitNodeDefault (NPnodePtr node);
-void npInitNodeCamera (NPnodePtr node);
+void npInitNodeDefault (pNPnode node);
+void npInitNodeCamera (pNPnode node);
 
 int	npNewNodeID();
 
-void* npNodeNew (int nodeType, NPnodePtr nodeParent, void* dataRef);
-void npNodeDelete (NPnodePtr node, void* dataRef);
-void npNodeRemove (int freeNode, NPnodePtr node, void* dataRef);
+pNPnode npNodeNew (int nodeType, pNPnode nodeParent, void* dataRef);
+pNPnode npNodeNewLink (pNPnode linkA, pNPnode linkB, void* dataRef);
+bool npNodeAttach (pNPnode node, pNPnode parent, void* dataRef);
+void npNodeDelete (pNPnode node, void* dataRef);
+void npNodeRemove (bool freeNode, pNPnode node, void* dataRef);
 
-void npSetTagOffset (NPnodePtr node);
+void npSetTagOffset (pNPnode node);
 
-NPnodePtr npGetActiveCam (void* dataRef);
+pNPnode npGetActiveCam (void* dataRef);
 
 #endif
 

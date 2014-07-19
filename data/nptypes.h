@@ -30,36 +30,55 @@
 #include "stdbool.h"
 
 #define kPI			 3.141593f
-#define kPos2PI		 6.283185f
+#define k2PI		 6.283185f
 #define kNeg2PI		-6.283185f
 #define kRADtoDEG	57.29578f
 
-#define	kNPtextureMax		2048
+#define	kNPtextureCountMax	2000
 
-#define kNPkeyMapSize		256				//keyboard map
-#define kNPkeyEventTypeSize 4
+#define kNPkeyMapSize		256				// keyboard map
+#define kNPkeyEventTypeSize 8				// 2^3 SHIFT, CTRL and ALT combos
 
 #define kNPmapFileBufferMax 134217727		// 128MB current file size limit
-											
+							
 #define	kNPnodeMax			262144			// 1MB with 32bit ptr, 2MB if 64bit
-#define kNPnodeRootMax		16383			// C99 max fix array size, 32bit OS
+#define kNPnodeRootMax		262144			// 1MB with 32bit ptr, 2MB if 64bit
 #define kNPnodeChildMax		266				// 1KB RAM each node with 32bit OS
-											// 266 fills a sphere at 15 deg
-											// switch data structure to GTK.org zz
+											// C99 max fixed array size is 16383
+											// 266 fills a sphere at 15 deg, possibly switch data structure to GTK.org zz
+
+#define kNPbranchLevelMax	28				// max branch depth for child nodes, zz debug add error handling
+											// limit of GL matrix stack max 32
 
 #define kNPcameraCount		4				// default number of camera views
 
 #define kNPfacetCube		6				// cube facet count
 
-#define kNPcubeLength		0.7072f			// cube length, width, height
+#define kNPcubeLength		1.4142136f		// cube edge length is sqrt(2)
 #define kNPsphereRadius		1.0f			// default radius of a sphere
+#define kNPcylinderRadius	1.0f			// default radius of a cylinder
 #define kNPtorusRadius		1.5f			// default radius of a torus
 #define kNPdefaultRatio		0.1f			// default innerRadius of a torus
-#define kNPpinHeight		5.0f			// z offset of child coordinates
+
+#define kNPoffsetUnit		1.0f			// default surface offset
+#define kNPoffsetCube		0.7071068f //(0.5f * kNPcubeLength)	// cube center height
+#define kNPoffsetTorus		0.75f //(0.5f * kNPtorusRadius)	// half torus radius
+#define kNPoffsetPin		5.0f			// cone point to center of dome
+#define kNPoffsetRod		10.0f			// rod length
+
+#define	kNPscaleDefault		0.5f;
+#define	kNPscaleRod			1.0f;			// parent rod, child not scaled
+#define	kNPscalePin			1.0f;			// parent pin, non-pin child
+#define	kNPscalePinPin		0.5f;			// parent and child pin scale 1/2
+#define kNPscaleCube		0.5f;			// parent cube, child is 1/3
+#define kNPscaleSphere		0.25f;			// parent sphere, child is 1/4
+#define kNPscaleCylinder	0.25f;			// parent cylinder, child is 1/4
+#define	kNPscaleTorus		0.25f;			// parent torus, child is 1/4
+#define	kNPscaleTorusTorus	0.5f;			// parent and child torus scale 1/2
 
 #define kNPgridSpacing		30.0f			// defualt grid spacing, was 10.0
 #define kNPgridSegmentsX	12				// default grid 16x16, was 16
-#define kNPgridSegmentsY	12				// default grid 16x16, was 16
+#define kNPgridSegmentsY	6				// default grid 16x16, was 16
 
 #define kNPpaletteSize		20				// index mapped color pallete
 
@@ -81,11 +100,14 @@
 
 #define kNPtitleSizeMax			63			// max length of the tag title
 #define kNPdescSizeMax			4095		// max length of the tag description	
-#define	kNPtagListMax			16383		// max number tags allowed to draw
+#define	kNPtagDrawMax			16383		// max number tags allowed to draw
 #define	kNPrecordTagListMax		kNPnodeMax	// max number of record Tags
+#define kNPlinkQueMax			kNPnodeMax	// max in draw que, not total nodes
 
+#define kNPsingleClickTime		0.45		//max duration considered to be a click
+#define kNPdoubleClickTime		0.45		//max duration for double click 
 
-#define kNPmaxTrackToAttributeMappings 1000 //JJ maximum number of mappings supported (fixed size array)
+#define kNPmaxTrackToAttributeMappings 50000 //JJ maximum number records in chmap file, of mappings supported (fixed size array)
 #define kNPattributeNameOffset	3			//JJ attribute name column in the ChMap file:  id, ch, track, attribute name, id1, id2, id3
 #define kNPchannelOffset		1			//JJ channel offset column in the ChMap file:   0   1    2         3           4    5    6
 #define kNPtrackOffset			2			//JJ track offset column in the ChMap file:     0   1    2         3           4    5    6
@@ -94,11 +116,11 @@
 #define kNPtrackBufferSize		65535		//JJ number of samples possible in the track buffer, NOTE: this is a circular
 											// buffer, the maximum size available to antz at any moment
 #define kNPmaxTracks			1000		//JJ maximum number of tracks supported on a channel
-#define kNPmaxFloatProperties	10000		//JJ maximum number of float properties fed by channel tracks
-#define kNPmaxUcharProperties	10000		//JJ maximum number of unsigned char properties fed by channel tracks
+#define kNPmaxFloatProperties	500000		//JJ maximum number of float properties fed by channel tracks
+#define kNPmaxUcharProperties	500000		//JJ maximum number of unsigned char properties fed by channel tracks
 #define kNPmaxLineLength		10000		//zz-JJ move to nptypes.h
 #define kNPmaxTokens			1000		//zz-JJ move to nptypes.h
-
+#define kNPmaxPropertiesMapped	500000		//JJ maximum number of node properties (one set for each data type) fed by channel tracks
 
 //------------------------------------------------------------------------------
 // Base Types - designed to be directly compatible with OpenGL
@@ -216,7 +238,8 @@ struct NPtextTag
 typedef struct NPtextTag NPtextTag;
 typedef struct NPtextTag *pNPtextTag;
 
-
+typedef struct NPnode NPnode;
+typedef struct NPnode *pNPnode;
 // nodes are organized as a branched tree, supports complexity of linked objects
 // ie a recNode of type nodeCamera may have a multiple depth daughter tree that
 // supports several cameras or videoNodes for circle cam rigs etc...
@@ -230,10 +253,10 @@ struct NPnode
 	
 	int			selected;					//true if node currently selected
 
-	void*		parent;						//parent node, binary tree of nodes
+	pNPnode		parent;						//parent node, binary tree of nodes
 	int			branchLevel;				//0 is the trunk, 1 is 1st branch
 											
-	void*		child[kNPnodeChildMax];		//children attached to this one
+	pNPnode		child[kNPnodeChildMax];		//children attached to this one
 	int			childIndex;					//the currently selected child
 	int			childCount;					//current number of children
 
@@ -281,9 +304,9 @@ struct NPnode
 
 	NPintXYZ	autoZoom;					//scales node to fit screen, scroll, center to node origin
 
-	NPintXYZ	triggerHi;				//triggers are multipurpose
+	NPintXYZ	triggerHi;					//triggers are multipurpose
 	NPintXYZ	triggerLo;
-	NPfloatXYZ	setHi;					//triggers
+	NPfloatXYZ	setHi;						//triggers
 	NPfloatXYZ	setLo;
 
 	NPfloatXYZ	proximity;					//used for collision engine 
@@ -301,10 +324,12 @@ struct NPnode
 	// below used for transparency and tags, not needed in CSV or DB file
 	pNPtextTag	tag;													//zz debug
 	NPfloatXYZ	screen;						//MB-LABEL
+	NPfloatXYZ	world;						//nodes world coordinates if updated
 	float		distFromCamera;				//MB-Transp					//zz debug
+	int			hudType;
+	bool		linkFlag;
 };
-typedef struct NPnode NPnode;
-typedef struct NPnode *NPnodePtr;
+
 
 
 //------------------------------------------------------------------------------
@@ -352,6 +377,12 @@ struct NPmouse {
 	int			translating;
 
 	bool		pinSelected;
+
+	bool		createEvent;			//used to create click, but not drag so cam works
+	bool		singleClick;
+	bool		doubleClick;
+
+	pNPnode		linkA;					//used by link tool to store first pick
 
 	int			size;					// memory used, add/del should modify this, debug zz
 };
@@ -425,7 +456,9 @@ struct NPtags {
 typedef struct NPtags NPtags;
 typedef struct NPtags * pNPtags;
 
-struct NPhud {	
+struct NPhud {
+	pNPnode		root;
+
 	bool		drawTags;
 	bool		drawCompass;
 	bool		drawCoord;
@@ -461,10 +494,15 @@ struct NPgl {
 
 	int			fullScreen;
 	int			stereo;
+	
+	bool		openDialog;													//zz-osx
 
 	int			windowID;
 
 	NPhud		hud;
+
+	pNPnode		linkQue[kNPnodeMax];
+	int			linkQueCount;
 
 	int			size;
 };
@@ -476,7 +514,7 @@ struct NPmap {
 	void**	node;					//root node array, size of kNPnodeRootMax
 	void**	sort;					//used for z-sort during GL draw
 
-	void**	nodeID;					//maps node ID to NPnodePtr, kNPnodeMax
+	void**	nodeID;					//maps node ID to pNPnode, kNPnodeMax
 	void**	sortID;					//maps node ID for sorting nodes
 
 	int*	parentID;				//maps node ID to parentID
@@ -488,11 +526,12 @@ struct NPmap {
 	int		nodeRootCount;			//number of root nodes
 	int		nodeRootIndex;			//the active node root
 	
-	NPnodePtr	currentNode;		//active node, commands, traversing tree
-	NPnodePtr	activeCam;			//active camera used for zsort distance
-	NPnodePtr	selectedGrid;		//selected grid
-	NPnodePtr	selectedPinNode;	//current node selection, can be a child branch
-	int			selectedPinIndex;	//helpful to know which tree we are on
+	pNPnode	currentNode;			//active node, commands, traversing tree
+	pNPnode	currentCam;				//active camera used for zsort distance
+	pNPnode	selectedGrid;			//selected grid
+	pNPnode	selectedPinNode;		//current node selection, can be a child branch
+	int		selectedPinIndex;		//helpful to know which tree we are on
+	pNPnode selectedHUD;			//the currently selected HUD item
 
 	NPboolXYZ	selectSet;			//current selection set to add too
 	int			selectAll;			//true when all nodes selected
@@ -702,6 +741,9 @@ struct NPcamera
 	float		exposure;					//in seconds
 	int			sensorType;					//3CCD, Debayer pattern...
 
+	float		matrix[16];					//for local to world coord convert
+	float		inverseMatrix[16];			//for local to world coord convert
+
 	int			size;
 };
 typedef struct NPcamera NPcamera;
@@ -870,6 +912,9 @@ enum
 	kNodePoints,			//for X/XY/XYZ line, eeg/ecg, temp, movement...
 	kNodePin,				//combo of cones, spheres, toroids, etc...
 	kNodeGrid,				//grid in 1D, 2D or 3D
+	kNodeLink,				//links any two nodes
+	kNodeHUD,				//HUD elements and tools
+	kNodeCount
 };
 
 /*
@@ -1147,7 +1192,7 @@ enum {
 
 	//global graph commands
 	kNPcmdMenu = 4242,
-	kNPcmdTagType,
+	kNPcmdTagMode,
 	
 	kNPcmdNew,
 	kNPcmdDelete,
@@ -1234,10 +1279,10 @@ enum {
 	kNPcmdShaderMode,
 	kNPcmdAlphaMode,
 
+	kNPcmdColorUp,
 	kNPcmdColorDown,
 	kNPcmdColorFade,
 	kNPcmdAltColor,
-	kNPcmdColorUp,
 	kNPcmdColorPallete,
 	
 	kNPcmdAlphaUp,
@@ -1248,6 +1293,7 @@ enum {
 	kNPcmdGainDown,
 
 	kNPcmdTexture,
+	kNPcmdTextureDown,
 
 	kNPcmdFreeze,
 	kNPcmdHide,
@@ -1260,16 +1306,24 @@ enum {
 	kNPcmdLines,
 	kNPcmdSegments,
 	kNPcmdShader,
-	kNPcmdPrimitive,
+	kNPcmdGeometry,
+	kNPcmdPrimitiveDown,
+
 	kNPcmdTopo,
+	kNPcmdTopoDown,
 	kNPcmdMesh,
 
 	kNPcmdSetpointLo,											// add kNPcmd..,  debug zz
+	kNPcmdSetpointLoOff,
 	kNPcmdSetpointHi,
+	kNPcmdSetpointHiOff,
 
 	kNPcmdFullscreen,
 
 	kNPcmdRatio,
+
+	kNPcmdTool,
+	kNPcmdToolDown,
 
 	kNPcmdCount
 };
@@ -1537,7 +1591,7 @@ enum {
 
 	// map file
 	kNPversion,
-	kNPtableCount,
+	kNPtableTypeCount,
 	kNPrecordCount,
 	kNPnodeRootCount,
 
@@ -1551,34 +1605,47 @@ enum {
 
 enum
 {
-	// GL primitives 
-	// GLUT
-	kNPglutWireCube = 0,
-	kNPglutSolidCube,
-	kNPglutWireSphere,
-	kNPglutSolidSphere,
-	kNPglutWireCone,
-	kNPglutSolidCone,
+	// GL primitives using GLUT and GLU
 
-	kNPglutWireTorus,
-	kNPglutSolidTorus,
+	// change to all solid with shader specifying wireframes or solid		//zz debug
+	// kNPgeoPoint = 0,
+	// kNPgeoLine,			//length 2
+	// kNPgeoTriangle,		//length 2
+	// kNPgeoQuad,			//length 2
+	// kNPgeoPentagon,		//
+	// kNPgeoCircle,		//radius 1
+	kNPgeoCubeWire = 0,
+	kNPgeoCube,				//length 2, currently is something else, what? //zz debug
+	kNPgeoSphereWire,
+	kNPgeoSphere,			//radius 1
+	kNPgeoConeWire,
+	kNPgeoCone,				//radius 1, height 2
 
-	kNPglutWireDodecahedron,
-	kNPglutSolidDodecahedron,
-	kNPglutWireOctahedron,
-	kNPglutSolidOctahedron,
-	kNPglutWireTetrahedron,
-	kNPglutSolidTetrahedron,
-	kNPglutWireIcosahedron,
-	kNPglutSolidIcosahedron,
+	kNPgeoTorusWire,
+	kNPgeoTorus,			//ratio 0.1, radius 1.5 should we change to 1.0 ?
 
-	kNPprimitiveSolidPin,		// solid and wire reversed, debug zz
-	kNPprimitiveWirePin,
+	kNPgeoDodecahedronWire,
+	kNPgeoDodecahedron,		//size ?
+	kNPgeoOctahedronWire,
+	kNPgeoOctahedron,		//size ?
+	kNPgeoTetrahedronWire,
+	kNPgeoTetrahedron,		//should have edge length of 2, actual size ?
+	kNPgeoIcosahedronWire,
+	kNPgeoIcosahedron,		//should have edge length of 2, actual size ?
 
-	kNPglutWireTeapot,
-	kNPglutSolidTeapot,
+	kNPgeoPin,				//height 5.5, 5 from tip to center of sphere
+	kNPgeoPinWire,								// solid and wire reversed, debug zz
 
-	kNPprimitiveCount	//add primitives, vertex, triangle, quad, circle, cylinder
+	kNPgeoCylinderWire,
+	kNPgeoCylinder,			//radius 1, height 2
+
+//	kNPglutWireTeapot,
+//	kNPglutSolidTeapot,
+
+	kNPgeoCount,	//add primitives, triangle, quad, circle, cylinder
+
+	kNPgeoSurface,
+	kNPgeoGrid
 };
 
 enum
@@ -1630,42 +1697,118 @@ enum
 	kNPnodeRootNull = 0,
 	kNPnodeRootCamera,			// root node index for all cameras
 	kNPnodeRootGrid,			// root node index for all grids
+//	kNPnodeRootLight,
+	kNPnodeRootHUD,
 	kNPnodeRootPin				// first root node for all pins
 };
 
 enum
 {
-	kNPpickModeNull = 0,
-	kNPpickModeCamera,			// pick cameras
-	kNPpickModeGrid,			// pick grids
-	kNPpickModePin,				// pick pins
-	kNPpickModeAll,				// pick anything
-	kNPpickModeCount
+	kNPmodeNull = 0,
+//	kNPmodeCombo,			// choose a combo of modes
+	kNPmodeCamera,			// pick cameras
+	kNPmodeGrid,			// pick grids
+	kNPmodePin,				// pick pins
+//	kNPmodeHUD,				// modify HUD element
+//	kNPmodeAll,				// pick anything
+	kNPmodeCount
 };
 
 enum
 {
 	kNPtoolNull = 0,		// default behavior based on pickMode
-	kNPtoolTranslate,		// pick cameras
-	kNPtoolRotate,			// pick grids
-	kNPtoolScale,			// pick pins
-	kNPtoolInfo,			// pick anything
-	kNPtoolHide,			// hide and unhide child nodes
-	kNPtoolFreeze,			// freeze node and child nodes
-	kNPtoolColor,			// change color and transparency
+	kNPtoolCreate,			// L-click creates new node, R-click to delete
+	kNPtoolLink,			// L-click to Select A then Select B, R-click to Cancel (re-select A)
+
+	kNPtoolCombo,			// Camera move or Pin select, move, rotate, scale and ratio
+							// choose a combo of tools, current default tool
+	kNPtoolMove,			// L-drag Move in XY, R-drag for XZ
+	kNPtoolRotate,			// L-drag Rotate XY, R-drag for Z
+	kNPtoolSize,			// L-drag Scale XYZ axes or R-drag for torus Ratio
+
+	kNPtoolPick,			// L-click to Pick an object, R-click for multiple
+	kNPtoolInfo,			// L-click toggles Text Tag, R-click hides Tag
+	kNPtoolHide,			// L-click Hide branches, R-click Show branches
+							// '~' key to Show ALL, '4' Hide ALL at branch level > 1
+
+	kNPtoolTopo,			// L-click next Topo type, R-click reverses
+	kNPtoolGeometry,		// L-click next Primitive type, R-click reverses
+							// Geometry does not effect Topology
+//	kNPtoolSegments,		// L-Click add or R-Click remove segments
+
+	kNPtoolColor,			// L-click next Color index, R-click reverses
+	kNPtoolAlpha,			// L-Click reduces Alpha color, R-Click increases
+	kNPtoolTexture,			// L-click next Topo type, R-click reverses
+
+	kNPtoolChannel,			// L-click next Channel, R-click reverses
+	kNPtoolFreeze,			// L-click Freezes node, R-click un-Freezes
+
+	kNPtoolSetpointHi,		// L-click to Set Upper Limit, R-click clears Setpoint
+	kNPtoolSetpointLo,		// L-click to Set Lower Limit, R-click clears Setpoint
+
 	kNPtoolCount
 };
 
 enum
 {
-	kNPtopoNull = 0,		//topology determined by node type
+	kNPcoord,
+	kNPcoordLatLongX,
+	kNPcoordScale,
+	kNPcoordCount
+};
+
+enum
+{
+	kNPcompassHeading = 0,
+	kNPcompassTilt,
+	kNPcompassRoll,
+	kNPcompassCoordX,
+	kNPcompassCoordY,
+	kNPcompassCoordZ,
+	kNPcompassCount
+};
+
+enum
+{
+	kNPhudNull = 0,
+	kNPhudTags,
+	kNPhudSelection,
+	kNPhudConsole,
+	kNPhudFPS,
+	kNPhudCompass,
+		kNPhudAngle,
+//			kNPhudTilt,
+//			kNPhudRoll,
+		kNPhudCoordX,		//perhaps just call kNPhudX,					zz debug
+//			kNPhudTranslate
+//			kNPhudScale
+//			kNPhudRotate
+		kNPhudCoordY,
+		kNPhudCoordZ,
+	kNPhudMode,
+	kNPhudTool,
+	kNPhudCursor,
+	kNPhudCount
+};
+
+
+//concept of default topo is in flux, think in terms of //zz debug
+//cut and paste various bramches, including making a 
+//sub-branch a root pin determined by parent node type
+//may not be worth it and do away with topoNull pins, CSVverOne
+enum
+{
+	kNPtopoNull = 0,	// linear 3D euclidean space
+//	kNPtopoGrid = 0,
 	kNPtopoCube,
 	kNPtopoSphere,
 	kNPtopoTorus,
-	kNPtopoSurface,			//need to create type, fix in ctrlCmd debug zz
+	kNPtopoCylinder,
 	kNPtopoPin,
-	kNPtopoGrid,
-
+	kNPtopoRod,
+	kNPtopoPlot,			//perhaps call it a plot and not a graph
+	kNPtopoCone,
+	kNPtopoSurface,
 	kNPtopoCount
 };
 
@@ -1678,9 +1821,12 @@ enum
 	kNPtableNode,
 	kNPtableChannels,
 	kNPtableChannelMap,
+	kNPtableChannelMeta,
 	kNPtableTag,
 	kNPtableFormat,
 	kNPtableMap,
+
+	kNPtableCount
 };
 
 enum
@@ -1690,6 +1836,7 @@ enum
 	kNPmsgWarn,
 	kNPmsgDebug,
 	kNPmsgCtrl,
+	kNPmsgHint,
 	kNPmsgFile,
 	kNPmsgNPE,
 	kNPmsgGL

@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
 *
-*  npgeometry.h
+*  npmath.h
 *
 *  ANTz - realtime 3D data visualization tools for the real-world, based on NPE.
 *
@@ -22,20 +22,20 @@
 *
 * --------------------------------------------------------------------------- */
 
-#ifndef NPGLSURFACE_H_
-#define NPGLSURFACE_H_
+#ifndef NPMATH_H_
+#define NPMATH_H_
 
+#include "../npdata.h"
 
-#include "../../npdata.h"
+//--- Functions ---------------------------------------------------------------
 
+void npCopyMatrix (float dest[], float src[]);
 
-void npInitGLPrimitive (void* dataRef);
-void npCloseGLPrimitive (void* dataRef);
+void npMultMatrix (float *matDest, float *matA, float *matB);
 
-void npGLSurface (bool texture, pNPnode node, void* dataRef);
+void npLocalToWorld (NPfloatXYZ *world, const float *inverseCam, const float *modelView);
 
-void npGLPrimitive (int geometry, float ratio);
-
-void npGLTexture(pNPnode node, void* dataRef);
+bool npInvertMatrixf (const float m[16], float invOut[16]);
 
 #endif
+

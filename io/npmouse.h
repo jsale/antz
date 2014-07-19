@@ -34,6 +34,7 @@ void npUpdateMouse (void* dataRef);
 
 void npMouseEvent (int button, int state, int x, int y);
 void npMouseMotion (int x, int y);
+void npMouseWheel (int wheel, int direction, int x, int y);
 
 void npSetCamTarget (void* dataRef);
 

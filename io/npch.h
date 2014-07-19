@@ -79,8 +79,8 @@ int npChNew (void* dataRef);
 void npChDelete (int channel, void* dataRef);
 
 //subscribes the node to the channel node->channel...
-void npChSubscribeNode (NPnodePtr node, void* dataRef);
-void npChRemoveNode (NPnodePtr node, void* dataRef);
+void npChSubscribeNode (pNPnode node, void* dataRef);
+void npChRemoveNode (pNPnode node, void* dataRef);
 
 void npUpdateCh (void* dataRef);
 void npUpdateNodes(void* dataRef);

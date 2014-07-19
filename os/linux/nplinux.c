@@ -26,10 +26,11 @@
 
 #include "../../npdata.h"
 
-#ifdef NP_LINUX_
+//#ifdef NP_LINUX_  // voidptr
+#ifndef NP_MSW_ // voidptr, some of these functions are used by both osx and linux
 
 #include <time.h>                // for gettimeofday()
-// #include <unistd.h>			//debug zz
+#include <unistd.h>			//debug zz
 
 //-----------------------------------------------------------------------------
 void npLinuxGetAppPath (char* buffer, int* size)
@@ -48,7 +49,8 @@ void npLinuxGetAppPath (char* buffer, int* size)
 	
 	//copy the app path to the passed in buffer
 	strcpy (buffer, appPath);
-
+	printf("\nApp Path : %s", buffer);  // voidptr
+	
 	//set the length
 	*size = strlen(buffer); 
 }
@@ -120,7 +122,8 @@ void npLinuxUpdateTime (void* dataRef)										//debug zz
 //-----------------------------------------------------------------------------
 void npLinuxSleep (double seconds)
 {
-	return;																//debug zz
+	usleep((int)(seconds * 1000000.0));										//zz-osx debug
+	return;
 }
 
 //-----------------------------------------------------------------------------

@@ -49,14 +49,17 @@ void npDeleteTag (int recordID, int tableID, void* dataRef);
 void npAddTag (pNPtextTag tag, void* dataRef);
 
 pNPtextTag npGetTag (int recordID, int tableID, void* dataRef);
-void npTagNode (NPnodePtr node, void* dataRef);
+void npTagNode (pNPnode node, void* dataRef);
 
 //called after loading a new state file or tag list file
 void npUpdateTextTag (pNPtextTag tag, void* dataRef);
 void npSyncTags (void* dataRef);
 
+void npDrawNodeTextTag (pNPnode node, void* dataRef);
 void npDrawTextTag (pNPtextTag tag, void* dataRef);
 void npDrawNodeTags (void* dataRef);
+
+void npGlutDrawString (void *font, char *str);
 
 #endif
 

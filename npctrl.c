@@ -40,16 +40,22 @@ void npCtrlVector (int command, void* dataRef);
 void npCtrlSelect (int command, void* dataRef);
 void npCtrlProperty (int command, void* dataRef);
 void npCtrlGlobal (int command, void* dataRef);
-void npCtrlChannel (int command, NPnodePtr node, void* dataRef);
+void npCtrlChannel (int command, pNPnode node, void* dataRef);
 
-void TraverseTree (int command, NPnodePtr node, void* dataRef);
+void TraverseTree (int command, pNPnode node, void* dataRef);
 
 void npDispatchMessages (void* dataRef);
+
+bool ctrlInitialized = false;		//prevents calls to CtrlCommand before init
 
 //------------------------------------------------------------------------------
 void npInitCtrl (void* dataRef)
 {
+	pData data = (pData) dataRef;
+
 	npInitEngine (dataRef);
+
+	ctrlInitialized = true;			//now safe to call CtrlCommand
 }
 
 //------------------------------------------------------------------------------
@@ -83,7 +89,7 @@ int npAppLoop (void* dataRef)
 
 
 //------------------------------------------------------------------------------
-void TraverseTree (int command, NPnodePtr node, void* dataRef)
+void TraverseTree (int command, pNPnode node, void* dataRef)
 {
 	int i = 0;
 	
@@ -91,7 +97,11 @@ void TraverseTree (int command, NPnodePtr node, void* dataRef)
 
 	// recursively iterate through all nodes in the tree
 	for (i=0; i < node->childCount ; i++)
-		TraverseTree (command, node->child[i], dataRef);
+	{
+		if ( node->type != kNodeLink				//prevents infinite loop, zz debug, should be safe to remove now
+			&& node->child[i]->child[0] != node )	//prevents double command update
+			TraverseTree (command, node->child[i], dataRef);
+	}
 	
 	if (data->io.mouse.tool == kNPtoolInfo)
 	{
@@ -112,11 +122,11 @@ void TraverseTree (int command, NPnodePtr node, void* dataRef)
 			node->hide = true;
 		else
 			node->hide = false;		//otherwise unhide all
-	}
-	
-	if (data->io.mouse.tool == kNPtoolNull
-		|| !(command == kNPcmdSelect || command == kNPcmdSelectOff) )
-	{
+	}else 
+		
+	//	if (//data->io.mouse.tool == kNPtoolCombo ||
+	//	 !(command == kNPcmdSelect || command == kNPcmdSelectOff) )
+	//{
 		if ( node->selected 
 			 || command == kNPcmdSelect 
 			 || command == kNPcmdSelectOff )
@@ -124,7 +134,7 @@ void TraverseTree (int command, NPnodePtr node, void* dataRef)
 			data->map.currentNode = node;
 			npCtrlCommandSet (command, node, dataRef);
 		}
-	}
+	//}
 }
 
 //------------------------------------------------------------------------------
@@ -134,8 +144,13 @@ void npCtrlCommand (int command, void* dataRef)
 	int indexTemp = 0;
 
 	pData data = (pData) dataRef;
-	NPnodePtr node = data->map.currentNode;
+	pNPnode node = data->map.currentNode;
 
+	if ( !ctrlInitialized )	//safety catch for startup procedures
+	{
+		printf ("err 6238 -  npCtrlCommand called before initialized\n");
+		return;
+	}
 
 	switch (command)
 	{
@@ -193,6 +208,9 @@ void npCtrlCommand (int command, void* dataRef)
 		case kNPcmdSelectThree : npCtrlSelect (command, dataRef); break;
 		case kNPcmdSelectSetNone : npCtrlSelect (command, dataRef); break;
 
+		case kNPcmdTool : npCtrlSelect (command, dataRef); break;
+		case kNPcmdToolDown : npCtrlSelect (command, dataRef); break;
+
 		case kNPcmdPresetOne : npDataPreset (command, dataRef); break;
 		case kNPcmdPresetTwo : npDataPreset (command, dataRef); break;
 		case kNPcmdPresetThree : npDataPreset (command, dataRef); break;
@@ -215,7 +233,7 @@ void npCtrlCommand (int command, void* dataRef)
 			// not a global command
 			// exclude global commands or only 1 selected node from applying to all nodes
 			// ie. allows for adding an unsellected node to the current group
-			if ( !node->selected || data->map.nodeRootIndex < kNPnodeRootPin ) //&& node != data->map.activeCam)//zz debug
+			if ( !node->selected || data->map.nodeRootIndex < kNPnodeRootPin ) //&& node != data->map.currentCam)//zz debug
 			{
 				npCtrlCommandSet (command, node, data);
 			}
@@ -234,7 +252,7 @@ void npCtrlCommand (int command, void* dataRef)
 void npCtrlCommandSet (int command, void* nodeRef, void* dataRef)
 {
 	pData data = (pData) dataRef;
-	NPnodePtr node = (NPnodePtr) nodeRef;
+	pNPnode node = (pNPnode) nodeRef;
 
 
 	switch (command)
@@ -288,24 +306,29 @@ void npCtrlCommandSet (int command, void* nodeRef, void* dataRef)
 		case kNPcmdAlphaDown : npCtrlProperty (command, dataRef); break;
 			
 		case kNPcmdTexture : npCtrlProperty (command, dataRef); break;
+		case kNPcmdTextureDown : npCtrlProperty (command, dataRef); break;
 		case kNPcmdCenter : npCtrlProperty (command, dataRef); break;
 		case kNPcmdLines : npCtrlProperty (command, dataRef); break;
 		case kNPcmdPoints : npCtrlProperty (command, dataRef); break;
 		case kNPcmdShader : npCtrlProperty (command, dataRef); break;
-		case kNPcmdPrimitive : npCtrlProperty (command, dataRef); break;
+		case kNPcmdGeometry : npCtrlProperty (command, dataRef); break;
+		case kNPcmdPrimitiveDown : npCtrlProperty (command, dataRef); break;
 		case kNPcmdTopo : npCtrlProperty (command, dataRef); break;
+		case kNPcmdTopoDown : npCtrlProperty (command, dataRef); break;
 		case kNPcmdMesh : npCtrlProperty (command, dataRef); break;
 		case kNPcmdScroll : npCtrlProperty (command, dataRef); break;
 		case kNPcmdFreeze : npCtrlProperty (command, dataRef); break;
 		case kNPcmdHide : npCtrlProperty (command, dataRef); break;
 		case kNPcmdClear : npCtrlProperty (command, dataRef); break;
 
-		case kNPcmdTagType : npCtrlProperty (command, dataRef); break;
+		case kNPcmdTagMode : npCtrlProperty (command, dataRef); break;
 
 		case kNPcmdSegments : npCtrlProperty (command, dataRef); break;
 
 		case kNPcmdSetpointLo : npCtrlProperty (command, dataRef); break;
+		case kNPcmdSetpointLoOff : npCtrlProperty (command, dataRef); break;
 		case kNPcmdSetpointHi : npCtrlProperty (command, dataRef); break;
+		case kNPcmdSetpointHiOff : npCtrlProperty (command, dataRef); break;
 
 		case kNPcmdRatio : npCtrlProperty (command, dataRef); break;	
 			
@@ -336,13 +359,19 @@ void npCtrlFile (int command, void* dataRef)
 		case kNPfileOpen :
 			if (data->io.gl.fullScreen)	//workaround, gl file dialog conflict
 			{	
-				npCtrlCommand(kNPcmdFullscreen, data);
-				file = npFileDialog (data->io.file.csvPath, kNPfileDialogOpen, dataRef);
-				npCtrlCommand(kNPcmdFullscreen, data);
+				npCtrlCommand (kNPcmdFullscreen, data);
+		//		file = npFileDialog (data->io.file.csvPath, kNPfileDialogOpen, dataRef);		//zz-osx
+		//		npCtrlCommand (kNPcmdFullscreen, data);
+				
+				//osx glut workaround for not exiting fullscreen
+				//the following flag is detected by ctrl during the run-loop
+				//this triggers the open dialog after fullscreen mode exit
+				data->io.gl.openDialog = true;													//zz-osx
 			}
 			else
 				file = npFileDialog (NULL, kNPfileDialogOpen, dataRef);
 			npCSVtoMap (file, kNPtableNode, dataRef);			//move this, debug zz
+			// npPostTool (NULL, data);												//zz-s
 			break;
 		case kNPfileClose : npFileDialog (NULL, kNPfileDialogClose, dataRef); break;
 
@@ -381,6 +410,7 @@ void npCtrlFile (int command, void* dataRef)
 				result = npFileOpenMap (filePath, 1, strlen(filePath), dataRef);
 			}
 			if (result) npPostMsg ("Done!", kNPmsgCtrl, dataRef);
+			npPostTool (NULL, data);												//zz-s
 			break;
 		case kNPfileMapTwo :
 			strcpy (filePath, data->io.file.csvPath);
@@ -398,6 +428,7 @@ void npCtrlFile (int command, void* dataRef)
 				result = npFileOpenMap (filePath, 1, strlen(filePath), dataRef);
 			}
 			if (result) npPostMsg ("Done!", kNPmsgCtrl, dataRef);
+			npPostTool (NULL, data);												//zz-s
 			break;
 		case kNPfileMapThree :
 			strcpy (filePath, data->io.file.csvPath);
@@ -415,6 +446,7 @@ void npCtrlFile (int command, void* dataRef)
 				result = npFileOpenMap (filePath, 1, strlen(filePath), dataRef);
 			}
 			if (result) npPostMsg ("Done!", kNPmsgCtrl, dataRef);
+			npPostTool (NULL, data);												//zz-s
 			break;
 		//zz-JJ
 		case kNPfileImport :
@@ -429,6 +461,7 @@ void npCtrlFile (int command, void* dataRef)
 				strcat (filePath, "ANTzChSet0001.csv");			
 				npFileOpenChSet (filePath, dataRef);
 			}
+			npPostTool (NULL, data);												//zz-s
 			break; //npFileDialog (NULL, kNPfileDialogImport, dataRef); break;
 		case kNPfileExport : npFileDialog (NULL, kNPfileDialogExport, dataRef); break;
 
@@ -451,12 +484,12 @@ void npCtrlVector (int command, void* dataRef)
 	float velocity = 0.0f;
 
 	pData data = (pData) dataRef;
-	NPnodePtr node = data->map.currentNode;		//apply command to currentNode
+	pNPnode node = data->map.currentNode;		//apply command to currentNode
 
 
 	//exit if in cam mode and this is not a camera node
-	if (data->io.mouse.pickMode == kNPpickModeCamera)
-		if (node != data->map.activeCam)
+	if (data->io.mouse.pickMode == kNPmodeCamera)
+		if (node != data->map.currentCam)
 			return;
 
 	// if shift pressed then use fast velocity, otherwise slow
@@ -574,9 +607,9 @@ void npCtrlSelect (int command, void* dataRef)
 	static char msgPart[256];
 
 	pData data = (pData) dataRef;
-	NPnodePtr node = data->map.currentNode;
-	NPnodePtr nodeChild = NULL;
-	NPnodePtr nodeParent = NULL;
+	pNPnode node = data->map.currentNode;
+	pNPnode nodeChild = NULL;
+	pNPnode nodeParent = NULL;
 
 
 	msgPart[0] = '\0';
@@ -603,12 +636,14 @@ void npCtrlSelect (int command, void* dataRef)
 				}
 				else if (node->type == kNodePin)
 				{	//if root create new pin, if shift create child
-					if (node->branchLevel == 0 && !data->io.key.modShift
+					if (node->branchLevel == 0 
+						&& !data->io.key.modShift
 						&& node->childCount > 0 )
 					{
 						node = npNodeNew (kNodePin, NULL, dataRef);
 						npNodeNew (node->type, node, dataRef);
-					} else
+					}
+					else
 						node = npNodeNew (node->type, node, dataRef);
 				}
 			}
@@ -625,19 +660,21 @@ void npCtrlSelect (int command, void* dataRef)
 			break;
 
 		case kNPcmdDelete :
-			npNodeDelete (node, dataRef);
+		//	if (data->io.mouse.createEvent == false)						//zz-s debug
+				npNodeDelete (node, dataRef);
 			npSetCamTarget (data);	//sets camera target to selected node
 			break;
 			
 		case kNPcmdPin :
-			if (data->io.mouse.pickMode != kNPpickModePin)
+			if (data->io.mouse.pickMode != kNPmodePin)
 			{
-				data->io.mouse.pickMode = kNPpickModePin;
+				data->io.mouse.pickMode = kNPmodePin;
 				npPostMsg("mode: Pin", kNPmsgCtrl, dataRef);
+				npPostTool (NULL, data);
 			}
 			if (data->map.nodeRootCount <= kNPnodeRootPin)		// if no nodes select cam
 			{
-				npSelectNode (data->map.activeCam, data);
+				npSelectNode (data->map.currentCam, data);
 				break;
 			}
 			if (data->map.nodeRootIndex < kNPnodeRootPin)		//camera or grid selected
@@ -686,6 +723,8 @@ void npCtrlSelect (int command, void* dataRef)
 					// select our next sibling node and make active
 					node = nodeParent->child[nodeParent->childIndex];
 					npSelectNode (node, data);
+
+					npSetCamTarget (data);
 				}
 			}
 			node = data->map.currentNode;
@@ -718,6 +757,7 @@ void npCtrlSelect (int command, void* dataRef)
 			}
 
 			npSelectNode (node, data);
+			npSetCamTarget (data);
 			
 			if (node->type == kNodeCamera)
 				sprintf(msgPart, "camera ");
@@ -725,6 +765,8 @@ void npCtrlSelect (int command, void* dataRef)
 				sprintf(msgPart, "grid ");
 			if (node->type == kNodePin)
 				sprintf(msgPart, "pin ");
+			if (node->type == kNodePin)
+				sprintf(msgPart, "link ");
 
 			if (node->recordID)
 				sprintf(msg, "%sid: %d   branchLevel: %d   recordID: %d", msgPart,
@@ -736,10 +778,11 @@ void npCtrlSelect (int command, void* dataRef)
 			break;
 				
 		case kNPcmdGrid :
-			if (data->io.mouse.pickMode != kNPpickModeGrid)
+			if (data->io.mouse.pickMode != kNPmodeGrid)
 			{
-				data->io.mouse.pickMode = kNPpickModeGrid;
+				data->io.mouse.pickMode = kNPmodeGrid;
 				npPostMsg("mode: Grid", kNPmsgCtrl, dataRef);
+				npPostTool (NULL, data);
 			}
 			if (data->map.nodeRootIndex == kNPnodeRootGrid)	// grid selected
 			{
@@ -789,9 +832,9 @@ void npCtrlSelect (int command, void* dataRef)
 			break;
 
 		case kNPcmdCamera :
-			if (data->io.mouse.pickMode != kNPpickModeCamera)
+			if (data->io.mouse.pickMode != kNPmodeCamera)
 			{
-				data->io.mouse.pickMode = kNPpickModeCamera;
+				data->io.mouse.pickMode = kNPmodeCamera;
 				npPostMsg("mode: Camera", kNPmsgCtrl, dataRef);
 			}
 			if (data->map.nodeRootIndex == kNPnodeRootCamera)	//camera selected
@@ -842,11 +885,11 @@ void npCtrlSelect (int command, void* dataRef)
 			}
 			else	// select the current camera if already selected
 			{
-				node = data->map.activeCam;
+				node = data->map.currentCam;
 				if (node == NULL)
 				{
 					node = data->map.node[kNPnodeRootCamera];
-					npPostMsg("err 7289 - activeCam is NULL",kNPmsgErr,data);
+					npPostMsg("err 7289 - currentCam is NULL",kNPmsgErr,data);
 				}
 				
 				//reset the camera if shift held, else switch cameras
@@ -900,15 +943,14 @@ void npCtrlSelect (int command, void* dataRef)
 				data->io.axes.z = true;
 				sprintf(msg, "axes: Z");
 			}
-			else if (data->io.axes.x == false 
-					 && data->io.axes.y == false
-					 && data->io.axes.z == true )
+			else
 			{
 				data->io.axes.x = true; 
 				data->io.axes.y = true; 
 				data->io.axes.z = true;
 				sprintf(msg, "axes: XYZ");
 			}
+
 			npPostMsg (msg, kNPmsgCtrl, dataRef);
 			break;
 
@@ -917,7 +959,8 @@ void npCtrlSelect (int command, void* dataRef)
 		case kNPcmdSelectToggle : node->selected = 1 - node->selected; break;
 
 		case kNPcmdSelectAll :
-			if (data->io.mouse.tool != kNPtoolNull)	//add more tool handling //zz debug
+			if (data->io.mouse.tool == kNPtoolHide 
+				|| data->io.mouse.tool == kNPtoolInfo )	//add more tool handling //zz debug
 				commandTemp = kNPcmdSelect;
 			else
 			{	
@@ -973,44 +1016,31 @@ void npCtrlSelect (int command, void* dataRef)
 			data->map.selectSet.z = false;
 			break;
 
-		//add proper key handling for modifier keys to map to any command, //zz debug
-		case kNPcmdHide :
-//			if (data->io.key.modAlt)
-			{
-				if (data->io.mouse.tool == kNPtoolHide)
-				{
-					data->io.mouse.tool = kNPtoolNull;
-					npPostMsg ("mouse tool: Disable Hide", kNPmsgCtrl, dataRef);
-				}
-				else
-				{
-					data->io.mouse.tool = kNPtoolHide;
-					npPostMsg ("mouse tool: Hide", kNPmsgCtrl, dataRef);
-				}
-				break;
-			}
-		case kNPcmdTagType :
-//			if (data->io.key.modAlt)
-			{
-				if (data->io.mouse.tool == kNPtoolInfo)
-				{
-					data->io.mouse.tool = kNPtoolNull;
-					npPostMsg ("mouse tool: Disable Info", kNPmsgCtrl, dataRef);
-				}
-				else
-				{
-					data->io.mouse.tool = kNPtoolInfo;
-					npPostMsg ("mouse tool: Info", kNPmsgCtrl, dataRef);
-				}
-				break;
-			}
+		case kNPcmdTool :
+			if (data->io.key.modShift)
+				data->io.mouse.tool--;
+			else
+				data->io.mouse.tool++;
+			if (data->io.mouse.tool <= 0)
+				data->io.mouse.tool = kNPtoolCount - 1;
+			if (data->io.mouse.tool >= kNPtoolCount)
+				data->io.mouse.tool = 1;
+			npPostTool (NULL, data);
+			break;
+		case kNPcmdToolDown : 
+			data->io.mouse.tool--;
+			if (data->io.mouse.tool <= kNPtoolNull)
+				data->io.mouse.tool = kNPtoolCount - 1;
+			npPostTool (NULL, data);
+			break;
+
 		default : break;
 	}
 }
 
 //zz-JJ
 //------------------------------------------------------------------------------
-void npCtrlChannel (int command, NPnodePtr node, void* dataRef)
+void npCtrlChannel (int command, pNPnode node, void* dataRef)
 {
 	char msg[128];
 	pData data = (pData) dataRef;
@@ -1019,13 +1049,17 @@ void npCtrlChannel (int command, NPnodePtr node, void* dataRef)
 	if (node->chInputID != 0)
 		npChRemoveNode (node, dataRef);
 
+	//handles freezing and unfreezing nodes		//zz-JJ
+	if (node->freeze)
+		return;
+
 	if (command == kNPcmdChannelUp)
 	{
 		node->chInputID = npChGetChannelAfter(&data->io.ch, node->chInputID);
 		sprintf (msg, "immediately after npChGetChannelAfter, channel: %d", node->chInputID );
 		npPostMsg (msg, kNPmsgDebug, dataRef);
 	}
-	else //assume command == kNPgraphChannelDown
+	else if (command == kNPcmdChannelDown)
 		node->chInputID = npChGetChannelBefore(&data->io.ch, node->chInputID);
 
 	npPostMsg ("..calling npChSubscribeNode", kNPmsgDebug, dataRef);
@@ -1035,6 +1069,71 @@ void npCtrlChannel (int command, NPnodePtr node, void* dataRef)
 	npPostMsg (msg, kNPmsgCtrl, dataRef);
 }
 
+
+//------------------------------------------------------------------------------
+void npUpdateTopo (pNPnode node, void* dataRef)
+{
+	char msg[128];
+	pData data = (pData) dataRef;
+
+	switch (node->topo)
+	{
+		case kNPtopoNull :
+			if (node->branchLevel == 0)
+				node->geometry = kNPgeoPin;
+			else
+				node->geometry = kNPgeoTorus;
+			sprintf(msg, "topo: %d default", node->topo); 
+			break;
+//		case kNPtopoGrid :
+//			node->geometry = kNPgeoGrid;				//zz debug
+//			sprintf(msg, "topo: %d default grid", node->topo);
+			break;
+		case kNPtopoCube : 
+			node->geometry = kNPgeoCube;
+			sprintf(msg, "topo: %d cube", node->topo);
+			break;
+		case kNPtopoSphere :
+			node->geometry = kNPgeoSphere;
+			sprintf(msg, "topo: %d sphere", node->topo); 
+			break;
+		case kNPtopoTorus : 
+			node->geometry = kNPgeoTorus;
+			sprintf(msg, "topo: %d torus", node->topo); 
+			break;
+		case kNPtopoCylinder :
+			node->geometry = kNPgeoCylinder;
+			sprintf(msg, "topo: %d cylinder", node->topo);
+			break;
+		case kNPtopoPin : 
+			node->geometry = kNPgeoPin;
+			sprintf(msg, "topo: %d pin", node->topo);
+			break;
+		case kNPtopoRod : 
+			node->geometry = kNPgeoCylinder;
+			sprintf(msg, "topo: %d rod", node->topo);
+			break;
+		case kNPtopoPlot :
+			node->geometry = kNPgeoSurface;
+			sprintf(msg, "topo: %d plot", node->topo);
+			break;
+		case kNPtopoCone :
+			node->geometry = kNPgeoCone;
+			sprintf(msg, "topo: %d cone", node->topo);
+			break;
+		case kNPtopoSurface :
+			node->geometry = kNPgeoSurface;
+			sprintf(msg, "topo: %d surface", node->topo);
+			break;
+		default : 
+			sprintf(msg, "topo: %d other", node->topo); 
+			break;
+	}
+	npSetTagOffset (node);
+	npPostMsg (msg, kNPmsgCtrl, dataRef);
+}
+
+
 //------------------------------------------------------------------------------
 void npCtrlProperty (int command, void* dataRef)
 {
@@ -1042,8 +1141,8 @@ void npCtrlProperty (int command, void* dataRef)
 	static char msgPart[256];
 
 	pData data = (pData) dataRef;
-	NPnodePtr node = data->map.currentNode;
-	NPnodePtr nodeParent = NULL;
+	pNPnode node = data->map.currentNode;
+	pNPnode nodeParent = NULL;
 
 
 	msgPart[0] = '\0';
@@ -1056,15 +1155,15 @@ void npCtrlProperty (int command, void* dataRef)
 		case kNPcmdColorUp :
 			node->colorIndex++;
 			SetIndexColor (&node->color, &node->colorIndex);
-			sprintf(msg, "color index: %d   r: %d   g: %d   b: %d",
+			sprintf(msg, "color index:%3d   RGB: %3d,%3d,%3d",
 				node->colorIndex, node->color.r, node->color.g, node->color.b);
 			npPostMsg (msg, kNPmsgCtrl, dataRef);
 			break;
 		case kNPcmdColorDown :
 			node->colorIndex--;
 			SetIndexColor (&node->color, &node->colorIndex);
-			sprintf(msg, "color index: %d   r: %d   g: %d   b: %d",
-				node->colorIndex, node->color.r, node->color.g, node->color.b);
+			sprintf(msg, "color index:%3d   RGB: %3d,%3d,%3d",
+				node->colorIndex, node->color.r, node->color.g, node->color.b, node->color.a);
 			npPostMsg (msg, kNPmsgCtrl, dataRef);
 			break;
 
@@ -1098,6 +1197,14 @@ void npCtrlProperty (int command, void* dataRef)
 			sprintf(msg, "textureID: %d", node->textureID);
 			npPostMsg (msg, kNPmsgCtrl, dataRef);
 			break;
+		case kNPcmdTextureDown :
+			node->textureID--;
+			if (node->textureID < 0)
+				node->textureID = data->io.gl.textureCount;
+
+			sprintf(msg, "textureID: %d", node->textureID);
+			npPostMsg (msg, kNPmsgCtrl, dataRef);
+			break;
 
 //		case kNPcmdCenter : node->center = 1 - node->center; break;
 
@@ -1112,22 +1219,35 @@ void npCtrlProperty (int command, void* dataRef)
 				node->pointSize = 0;
 			break;
 
-		case kNPcmdPrimitive :
+		case kNPcmdGeometry :
 			if (data->io.key.modShift)
 				node->geometry--;
 			else
 				node->geometry++;
 
-			if (node->geometry > kNPprimitiveSolidPin)
+			if (node->geometry >= kNPgeoCount )//kNPgeoPin)	//zz debug
 				node->geometry = 0;
 			if (node->geometry < 0)
-				node->geometry = kNPprimitiveSolidPin;
+				node->geometry = kNPgeoCount - 1;//kNPgeoPin;
+			npSetTagOffset (node);
+			sprintf(msg, "geometry: %d", node->geometry);
+			npPostMsg (msg, kNPmsgCtrl, dataRef);
+			break;
+		case kNPcmdPrimitiveDown :
+			node->geometry--;
+			if (node->geometry < 0)
+				node->geometry = kNPgeoPin;
 			npSetTagOffset (node);
 			sprintf(msg, "geometry: %d", node->geometry);
 			npPostMsg (msg, kNPmsgCtrl, dataRef);
 			break;
 
 		case kNPcmdTopo :
+			if (node->topo == kNPtopoPlot)
+			{
+				npPostMsg ("topo: link is Locked!", kNPmsgCtrl, dataRef);
+				return;
+			}
 			if (data->io.key.modShift)
 			{
 				node->facet++;
@@ -1139,45 +1259,16 @@ void npCtrlProperty (int command, void* dataRef)
 			else
 			{	
 				node->topo++;
-
-				if (node->topo > 4)//kNPtopoCount)						//zz debug
-					node->topo = 0;
-		
-				switch (node->topo)
-				{
-					case kNPtopoNull :
-						if (node->branchLevel == 0)
-							node->geometry = kNPprimitiveSolidPin;
-						else
-							node->geometry = kNPglutSolidTorus;
-						sprintf(msg, "topo: %d default", node->topo); 
-						break;
-					case kNPtopoCube : 
-						node->geometry = kNPglutSolidCube;
-						sprintf(msg, "topo: %d cube", node->topo);
-						break;
-					case kNPtopoSphere :
-						node->geometry = kNPglutSolidSphere;
-						sprintf(msg, "topo: %d sphere", node->topo); 
-						break;
-					case kNPtopoTorus : 
-						node->geometry = kNPglutSolidTorus;
-						sprintf(msg, "topo: %d torus", node->topo); 
-						break;
-					case kNPtopoSurface : node->topo++; //skip this type for now debug zz //printf("topo: %d surface\n", node->topo); break;
-					case kNPtopoPin : 
-						node->geometry = kNPprimitiveSolidPin;
-						sprintf(msg, "topo: %d pin", node->topo);
-						break;
-					case kNPtopoGrid :
-				//		node->geometry = kNPgeoGrid;				//zz debug
-						sprintf(msg, "topo: %d grid", node->topo);
-						break;
-					default : sprintf(msg, "topo: %d other", node->topo); break;
-				}
-				npSetTagOffset (node);
-				npPostMsg (msg, kNPmsgCtrl, dataRef);
+				if (node->topo >= kNPtopoPlot)  // kNPtopoCount			//zz debug
+					node->topo = 1;
+				npUpdateTopo (node, data);
 			}
+			break;
+		case kNPcmdTopoDown :
+				node->topo--;
+				if (node->topo < 1)
+					node->topo = kNPtopoPlot - 1;  // kNPtopoCount		//zz debug
+				npUpdateTopo (node, data);
 			break;
 
 		case kNPcmdShader :
@@ -1196,11 +1287,15 @@ void npCtrlProperty (int command, void* dataRef)
 //		case kNPcmdScroll : node->scroll = 1 - node->scroll; break;
 		case kNPcmdFreeze :
 			node->freeze = 1 - node->freeze;
-			if (node->freeze)
+			//if a assigned channel then update subscribe
+			if (node->chInputID)
+				npCtrlChannel (command, node, data);
+			if (node->freeze)	
 				npPostMsg ("freeze", kNPmsgCtrl, dataRef);
 			else
 				npPostMsg ("unfreeze", kNPmsgCtrl, dataRef);
 			break;
+			
 		case kNPcmdHide :
 			node->hide = 1 - node->hide;
 			if (node->hide)
@@ -1292,6 +1387,12 @@ void npCtrlProperty (int command, void* dataRef)
 			}
 			npPostMsg (msg, kNPmsgCtrl, dataRef);
 			break;
+		case kNPcmdSetpointLoOff :
+				node->triggerLo.x = false;
+				node->triggerLo.y = false;
+				node->triggerLo.z = false;
+			npPostMsg ("Set Lower Limit OFF", kNPmsgCtrl, dataRef);
+			break;
 		case kNPcmdSetpointHi :
 			sprintf(msg, "Set Upper Limit ");
 			if (data->io.key.modShift)
@@ -1327,12 +1428,18 @@ void npCtrlProperty (int command, void* dataRef)
 			}
 			npPostMsg (msg, kNPmsgCtrl, dataRef);
 			break;
+		case kNPcmdSetpointHiOff :
+				node->triggerHi.x = false;
+				node->triggerHi.y = false;
+				node->triggerHi.z = false;
+			npPostMsg ("Set Upper Limit OFF", kNPmsgCtrl, dataRef);
+			break;
 
-		case kNPcmdTagType :
+		case kNPcmdTagMode :
 			node->tagMode++;
 			if (node->tagMode >= kNPtagModeCount)					//debug zz
 				node->tagMode = 0;
-			sprintf(msg, "text tag type: %d", node->tagMode);
+			sprintf(msg, "tag mode: %d", node->tagMode);
 			npPostMsg (msg, kNPmsgCtrl, dataRef);
 			break;
 
@@ -1364,7 +1471,7 @@ void npCtrlGlobal (int command, void* dataRef)
 
 	pData data = (pData) dataRef;
 
-	NPnodePtr node = data->map.node[data->map.nodeRootIndex];
+	pNPnode node = data->map.node[data->map.nodeRootIndex];
 
 	switch (command)
 	{
@@ -1453,6 +1560,7 @@ void npCtrlGlobal (int command, void* dataRef)
 void npUpdateCtrl (void* dataRef)
 {
 	bool flag = false;
+	static int count = 0;
 	int i = 0;
 	static int firstRunLoop = true;
 	static char msg[256];
@@ -1492,6 +1600,19 @@ void npUpdateCtrl (void* dataRef)
 				strcpy( data->io.url, data->io.argv[i] );
 			else
 				npFileOpenMap (data->io.argv[i], 1, 13, dataRef);
+		}
+	}
+	
+	//workaround for exiting fullscreen under OSX to show file dialog
+	if (data->io.gl.openDialog && !data->io.gl.fullScreen)					//zz-osx
+	{
+		count++;
+		if (count > 2)	//prevents black fullscreen
+		{
+			count = 0;
+			data->io.gl.openDialog = false;
+			npCtrlCommand (kNPfileOpen, data);
+			npCtrlCommand (kNPcmdFullscreen, data);	//now re-enter fullscreen
 		}
 	}
 }

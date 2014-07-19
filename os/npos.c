@@ -36,8 +36,8 @@ double nposGetTime (void)
 		return npMSWGetTime ();
 #endif
 #ifdef NP_OSX_
-		return npLinuxGetTime ();
-		//return npOSXGetTime ();	//OSX can often use the linux method
+		return npLinuxGetTime (); // voidptr
+//		npOSXGetTime ();	//OSX can often use the linux method  // voidptr
 #endif
 }
 
@@ -52,7 +52,7 @@ void nposUpdateTime (void* dataRef)
 #endif
 #ifdef NP_OSX_
 		npLinuxUpdateTime (dataRef);
-		//npOSXUpdateTime (dataRef);	//OSX can often use the linux method
+//		npOSXUpdateTime (dataRef);	//OSX can often use the linux method //voidptr
 #endif
 }
 
@@ -66,8 +66,8 @@ void nposSleep (double seconds)
 		npMSWSleep (seconds);
 #endif
 #ifdef NP_OSX_
-		npLinuxSleep (seconds);
-		//npOSXSleep (seconds);
+		npLinuxSleep (seconds);  // voidptr
+//		npOSXSleep (seconds); // voidptr
 #endif
 }
 
@@ -81,8 +81,9 @@ void nposGetAppPath (char* buffer, int* size)
 		npMSWGetAppPath (buffer, size);
 #endif
 #ifdef NP_OSX_
-		npLinuxGetAppPath (buffer, size);
-//		npOSXGetAppPath (buffer, size);
+//		npLinuxGetAppPath (buffer, size);
+		npOSXGetAppPath (buffer, size);  // voidptr
+//voidptr
 #endif
 }
 
@@ -97,7 +98,7 @@ void nposGetCWD (char* buffer, int* size)
 #endif
 #ifdef NP_OSX_
 		npLinuxGetCWD (buffer, size);
-//		npOSXGetCWD (buffer, size);
+	//	npOSXGetCWD (buffer, size);  //voidptr
 #endif
 }
 
@@ -111,8 +112,8 @@ void nposSetCWD (char* buffer)
 		npMSWSetCWD (buffer);
 #endif
 #ifdef NP_OSX_
-		npLinuxSetCWD (buffer);
-//		npOSXSetCWD (buffer);
+		npLinuxSetCWD (buffer);//voidptr
+//		npOSXSetCWD (buffer);  //voidptr
 #endif
 }
 
@@ -126,8 +127,8 @@ void nposGetOpenFilePath (char* buffer, int* size, void* dataRef)
 		npMSWGetOpenFilePath (buffer, size, dataRef);
 #endif
 #ifdef NP_OSX_
-		npLinuxGetOpenFilePath (buffer, size, dataRef);
-//		npOSXGetOpenFilePath (buffer, size, dataRef);
+//		npLinuxGetOpenFilePath (buffer, size, dataRef);  //voidptr
+		npOSXGetOpenFilePath (buffer, size, dataRef);  //voidptr
 #endif
 }
 
@@ -141,8 +142,8 @@ void nposSetOpenFilePath (char* buffer, void* dataRef)
 		npMSWSetOpenFilePath (buffer, dataRef);
 #endif
 #ifdef NP_OSX_
-		npLinuxSetOpenFilePath (buffer, dataRef);
-//		npOSXSetOpenFilePath (buffer, dataRef);
+//		npLinuxSetOpenFilePath (buffer, dataRef);//voidptr
+		npOSXSetOpenFilePath (buffer, dataRef);  //voidptr
 #endif
 }
 
@@ -156,7 +157,8 @@ FILE* nposFileDialog (const char* fileName, int dialogType, void* dataRef)
  return npMSWFileDialog (fileName, dialogType, dataRef);
 #endif
 #ifdef NP_OSX_
- return npOSXGetFileDialog (fileName, dialogType, dataRef);
+// return npOSXGetFileDialog (fileName, dialogType, dataRef); // voidptr
+	return npOSXFileDialog(fileName, dialogType, dataRef); // voidptr
 #endif
 }
 
@@ -170,7 +172,8 @@ int nposSetCursorPos (int x, int y)
  return npMSWSetCursorPos (x,y);
 #endif
 #ifdef NP_OSX_
- return npOSXSetCursorPos (x,y);
+ npOSXSetCursorPos (x,y);
+	return 0;
 #endif
 }
 
@@ -184,7 +187,8 @@ int nposShowCursor (int hide)
  return npMSWShowCursor (hide);
 #endif
 #ifdef NP_OSX_
- return npOSXShowCursor (hide);
+ npOSXShowCursor (hide);
+	return 0;
 #endif
 }
 
@@ -199,8 +203,8 @@ void nposTimeStampCSV (char* fileName)
 		npMSWTimeStampCSV (fileName);
 #endif
 #ifdef NP_OSX_
-		npLinuxTimeStampCSV (fileName);
-//		npOSXTimeStampCSV (fileName);
+//		npLinuxTimeStampCSV (fileName);
+		npOSXTimeStampCSV (fileName);  // voidptr
 #endif
 }
 
@@ -213,7 +217,7 @@ bool nposSupportsAntzThreads()
 		return false;
 	#endif
 	#ifdef NP_MSW_
-		return true;
+		return false;
 	#endif
 	#ifdef NP_OSX_
 		return false;

@@ -99,77 +99,129 @@ void npCloseGLPrimitive (void* dataRef)
 	return;
 }
 
+//used only to draw outline wireframes
 //------------------------------------------------------------------------------
 void npGLPrimitive (int geometry, float ratio)
 {
-	glPushMatrix();
+	glPushMatrix();									//is glPushMatrix necessary, zz debug
 
 	//draw the object using the primitive DL offset by geometry index
-	if (geometry == kNPglutSolidTorus || geometry == kNPglutWireTorus)
+	if (geometry == kNPgeoTorus || geometry == kNPgeoTorusWire)
 		npDrawTorus (geometry, ratio);
 	else
 		glCallList (primitiveDL + geometry);
 
-//	glLineWidth(1.0f);	//reset to default of 1.0f line thickness
 	glPopMatrix();
 }
 
+//used to draw all geometry primitive types
 //------------------------------------------------------------------------------
-void npGLSurface (bool texture, NPnodePtr node, void* dataRef)
+void npGLSurface (bool texture, pNPnode node, void* dataRef)
 {
-	glPushMatrix();
-//	glLineWidth(node->lineWidth);		//for wireframe objects
+	pData data = (pData) dataRef;
+
+	glPushMatrix();									//is glPushMatrix necessary, zz debug
+
+	glLineWidth (node->lineWidth);		//for wireframe objects
 
 	// turn on texture coordinates specific for each primitive type
 	if (texture)
-		npGLTexture (node->geometry, node->textureID, dataRef);
+		npGLTexture (node, dataRef);
 
-	if (node->geometry == kNPglutSolidTorus)
+	if (node->geometry == kNPgeoTorus)
 		npDrawTorus (node->geometry, node->ratio);
 	else
-	//draw the object using the primitive DL offset by geometry index
-	glCallList (primitiveDL + node->geometry);
+	{
+		//slide down 1 unit to center cylinder								//zz debug
+		if ( ( node->geometry == kNPgeoCylinder || node->geometry == kNPgeoCylinderWire
+			   || node->geometry == kNPgeoCone || node->geometry == kNPgeoConeWire )
+	//		&& !( node->topo == kNPtopoRod || node->type == kNodeLink ) )
+				||  ( node->topo != kNPtopoPin 
+						&& ( node->geometry == kNPgeoPin 
+							|| node->geometry == kNPgeoPinWire ) ) )
+			glTranslatef (0.0f, 0.0f, -kNPoffsetUnit);
+	//	else if (node->geometry == kNPgeoPinWire)
+	//		glTranslatef (0.0f, 0.0f, -kNPoffsetPin);
 
+		//draw the object using the primitive DL offset by geometry index
+		if (data->io.gl.pickPass)
+		{									
+			//if odd add 1 to get a solid
+			//logic forces draws wireframe as solid during pickPass
+			//also an exception for pin which is out of order in geometry list, zz debug
+			if (node->geometry == kNPgeoPinWire)
+				glCallList (primitiveDL + kNPgeoPin);
+			else if (node->geometry % 2 == 0 && node->geometry != kNPgeoPin)
+				glCallList (primitiveDL + node->geometry + 1);
+			else
+				glCallList (primitiveDL + node->geometry);
+		}
+		else
+			glCallList (primitiveDL + node->geometry);
+	}
 	// turn off texturing
-	if (texture && node->textureID)		//dual param for picking pass, debug zz
+	if (texture && node->textureID)					//dual param for pickPass, debug zz
 		glDisable ( GL_TEXTURE_2D );
 
-//	glLineWidth(1.0f);	//reset to default of 1.0f line thickness
+	glLineWidth (1.0f);				//reset to default of 1.0f line thickness, zz debug
+
 	glPopMatrix();
 }
 
 
 //MB-TEXTURE
 //------------------------------------------------------------------------------
-void npGLTexture (int geometry, int textureID, void* dataRef)
+void npGLTexture (pNPnode node, void* dataRef)
 {
-	static GLfloat sgenparams[] = {  1.0f, 0.0f,  0.0f,  0.0f };
-	static GLfloat tgenparams[] = {  0.0f, 1.0f,  0.0f,  0.0f };
+//	const GLfloat sgenparams[] = { 1.0f, 0.0f, 0.0f, 0.0f };
+//	const GLfloat tgenparams[] = { 0.0f, 1.0f, 0.0f, 0.0f };
+	const GLfloat sgenparams[] = { 1.0f, 0.0f, 0.0f, 0.0f };
+	const GLfloat tgenparams[] = { 0.0f, 1.0f, 0.0f, 0.0f };
 
 	pData data = (pData) dataRef;
 
 	//exit if no texture or pickPass, picking requires no texture mapping
-	if (!textureID || data->io.gl.pickPass)
+	if (!node->textureID || data->io.gl.pickPass)
 		return;
 
 	glEnable ( GL_TEXTURE_2D );
+	glBindTexture ( GL_TEXTURE_2D, node->textureID );
 
-	glBindTexture ( GL_TEXTURE_2D, textureID );
-//			glTexEnvf( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL );
-	glTexEnvf( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE );
-	//			glTexGeni( GL_S, GL_TEXTURE_GEN_MODE, GL_SPHERE_MAP ); // metal appearance
-	//			glTexGeni( GL_T, GL_TEXTURE_GEN_MODE, GL_SPHERE_MAP );
-	glTexGeni( GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR );
-	glTexGeni( GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR );
-	//			glTexGeni( GL_S, GL_TEXTURE_GEN_MODE, GL_EYE_LINEAR );
-	//			glTexGeni( GL_T, GL_TEXTURE_GEN_MODE, GL_EYE_LINEAR );
-	glEnable( GL_TEXTURE_GEN_S );
-	glEnable( GL_TEXTURE_GEN_T );
-	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
-	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
+	//use different texturing for the gluSphere
+	if ( node->geometry == kNPgeoSphere // || geometry == kNPgeoSphereWire		//zz debug
+		|| node->geometry == kNPgeoCylinder ) // || geometry == kNPgeoCylinderWire
+	{
+		glDisable( GL_TEXTURE_GEN_S );	//prevents intermittent texture anomally
+		glDisable( GL_TEXTURE_GEN_T );
+	}
+	else
+	{
+		glTexEnvf( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE );
 
-	glTexGenfv( GL_S, GL_OBJECT_PLANE, sgenparams );
-	glTexGenfv( GL_T, GL_OBJECT_PLANE, tgenparams );
+		glTexGeni( GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR );
+		glTexGeni( GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR );
+			// metal appearance
+			// glTexGeni( GL_S, GL_TEXTURE_GEN_MODE, GL_SPHERE_MAP );
+			// glTexGeni( GL_T, GL_TEXTURE_GEN_MODE, GL_SPHERE_MAP );
+
+		glEnable( GL_TEXTURE_GEN_S );
+		glEnable( GL_TEXTURE_GEN_T );
+
+		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
+		glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
+
+			//rather sharp setting, but probably best for mapping
+			//for video use GL_LINEAR_MIPMAP_NEAREST when the angle is close 
+			//to perpendicular less artifacts and a bit more blurry
+	//		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST_MIPMAP_NEAREST);		//zz debug, add mipmapping...
+	//		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+
+	//	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);		//zz debug, add mipmapping...
+	//	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+		glTexGenfv( GL_S, GL_OBJECT_PLANE, sgenparams );
+		glTexGenfv( GL_T, GL_OBJECT_PLANE, tgenparams );
+	}
 }
 
 
@@ -357,50 +409,52 @@ void npDrawTorus (int geometry, GLfloat innerRadius)
 		glCallList (primitiveDL + geometry);
 	else
 	{
-		if (geometry == kNPglutWireTorus)
-			npGLWireTorus (1.5f * innerRadius, 1.5f, 8, 16);	//	7, 16);
+		if (geometry == kNPgeoTorusWire)
+			npGLWireTorus (kNPtorusRadius * innerRadius, kNPtorusRadius, 7, 16);	//	7, 16);
 		else
-			npGLSolidTorus (1.5f * innerRadius, 1.5f, 8, 12);	//	7, 16);
+			npGLSolidTorus(kNPtorusRadius * innerRadius, kNPtorusRadius, 7, 16);	//	7, 16);
 	}
 }
 
 
-// Draw Pin, ice-cream cone shape
+// Draw Pin, ice-cream cone shape, width is a 10% the cone height
+// the icecream dome sticks up an additional 10% so total height is 110% height
 //------------------------------------------------------------------------------
 void DrawPinDL() 
 {
-	glTranslatef (0.0f, 0.0f, 5.0f);
+	glTranslatef (0.0f, 0.0f, kNPoffsetPin);
 	glRotatef (180.0f, 0.0f, 1.0f, 0.0f);
-	npGLSolidCone (0.5f, 5.0f, 10, 1);
+	npGLSolidCone (kNPoffsetPin * 0.1f, kNPoffsetPin, 10, 1);
 
 	glRotatef (-180.0f, 0.0f, 1.0f, 0.0f);	//undo rotation n save on pushMatrix
-	npGLSolidSphere (0.5f, 10, 10);
+	npGLSolidSphere (kNPoffsetPin * 0.1f, 10, 10);
 }
 
-// Draw Pin, ice-cream cone shape
+// Draw Pin, ice-cream cone shape, width is a 10% the cone height
+// the icecream dome sticks up an additional 10% so total height is 110% height
 //------------------------------------------------------------------------------
 void DrawPinWireDL() 
 {
-	glTranslatef (0.0f, 0.0f, 5.0f);
+	glTranslatef (0.0f, 0.0f, kNPoffsetPin);
 	glRotatef (180.0f, 0.0f, 1.0f, 0.0f);
-	npGLWireCone (0.5f, 5.0f, 10, 1);
+	npGLWireCone (kNPoffsetPin * 0.1f, kNPoffsetPin, 10, 1);
 
 	glRotatef (-180.0f, 0.0f, 1.0f, 0.0f);	//undo rotation n save on pushMatrix
-	npGLWireSphere (0.5f, 10, 10);
+	npGLWireSphere (kNPoffsetPin * 0.1f, 10, 10);
 }
 
 
 //------------------------------------------------------------------------------
 void DrawTorusDL() 
 {
-	npGLSolidTorus (0.15f, 1.5f, 7, 16);
+	npGLSolidTorus (kNPtorusRadius * 0.1f, kNPtorusRadius, 7, 16);
 }
 
 
 //------------------------------------------------------------------------------
 void DrawTorusWireDL() 
 {
-	npGLWireTorus (0.15f, 1.5f, 7, 16);
+	npGLWireTorus (kNPtorusRadius * 0.1f, kNPtorusRadius, 7, 16);
 }
 
 
@@ -487,14 +541,135 @@ GLuint CreateTorusWireDL()
 	return (displayList);
 }
 
+//------------------------------------------------------------------------------
+void DrawSphereWireDL()
+{
+	GLUquadricObj *sphere = NULL;
+
+	sphere = gluNewQuadric();
+	gluQuadricDrawStyle (sphere, GLU_LINE);	//GLU_LINE
+	gluQuadricTexture (sphere, true);
+	gluQuadricNormals (sphere, GLU_FLAT);
+
+	//Making a display list
+	// mysphereID = glGenLists(1);
+	// glNewList(mysphereID, GL_COMPILE);
+
+	glPushMatrix();							//update to not use a pushMatrix, zz debug
+		glRotatef (180.0f, 0.0f, 0.0f, 1.0f);	//orient world texture for coord 0,0
+		gluSphere (sphere, 1.0, 24, 12);
+	glPopMatrix();
+
+	// glEndList();		
+	// gluDeleteQuadric(sphere);				``````````````//zz debug, should use this
+}
+
+//------------------------------------------------------------------------------
+void DrawSphereDL()
+{
+	GLUquadricObj *sphere = NULL;
+
+	sphere = gluNewQuadric();
+	gluQuadricDrawStyle (sphere, GLU_FILL);
+	gluQuadricTexture (sphere, true);
+	gluQuadricNormals (sphere, GLU_SMOOTH);
+
+	//Making a display list
+	// mysphereID = glGenLists(1);
+	// glNewList(mysphereID, GL_COMPILE);
+
+	glPushMatrix();							//update to not use a pushMatrix, zz debug
+		glRotatef (180.0f, 0.0f, 0.0f, 1.0f);	//orient world texture for coord 0,0
+		gluSphere (sphere, 1.0, 24, 12);		//replace glu with custom optimized
+	glPopMatrix();
+
+	// glEndList();
+	// gluDeleteQuadric(sphere);						//zz debug, should use this
+}
+
+//------------------------------------------------------------------------------
+void DrawCylinderWireDL()
+{
+	GLUquadricObj *gluObject = NULL;
+
+	gluObject = gluNewQuadric();
+	gluQuadricDrawStyle (gluObject, GLU_LINE);
+	gluQuadricTexture (gluObject, true);		//faster without texture coords, zz debug
+	gluQuadricNormals (gluObject, GLU_SMOOTH);
+
+	//Making a display list
+	// mysphereID = glGenLists(1);
+	// glNewList(mysphereID, GL_COMPILE);
+
+	glPushMatrix();							//update to not use a pushMatrix, zz debug
+		glRotatef (180.0f, 0.0f, 0.0f, 1.0f);	//orient world texture for coord 0,0
+		gluCylinder (gluObject, 1.0, 1.0, 2.0, 24, 1);
+	glPopMatrix();
+
+	// glEndList();
+	// gluDeleteQuadric(sphere);				``````````````//zz debug, should use this
+}
+//------------------------------------------------------------------------------
+void DrawCylinderDL()
+{
+	GLUquadricObj *gluObject = NULL;
+
+	gluObject = gluNewQuadric();
+	gluQuadricDrawStyle (gluObject, GLU_FILL);
+	gluQuadricTexture (gluObject, true);									//zz-osx debug TRUE
+	gluQuadricNormals (gluObject, GLU_SMOOTH);
+
+	//Making a display list
+	// mysphereID = glGenLists(1);
+	// glNewList(mysphereID, GL_COMPILE);
+
+	glPushMatrix();								//update to not use a pushMatrix, zz debug
+		glRotatef (180.0f, 0.0f, 0.0f, 1.0f);	//orient world texture for coord 0,0
+		gluCylinder (gluObject, 1.0, 1.0, 2.0, 24, 1);
+		glRotatef (180.0f, 1.0f, 0.0f, 0.0f);	//flips the disk over
+		gluDisk (gluObject, 0.0, 1.0, 24, 1);	//draw bottom disk
+		glRotatef (180.0f, 0.0f, 1.0f, 0.0f);	//flip to right-side up
+		glTranslatef (0.0f, 0.0f, 2.0f);		//translate to the top
+		gluDisk (gluObject, 0.0, 1.0, 24, 1);	//draw top disk
+	glPopMatrix();
+
+	// glEndList();
+	// gluDeleteQuadric(sphere);				``````````````//zz debug, should use this
+}
+
+//------------------------------------------------------------------------------
+void DrawConeDL()
+{
+	GLUquadricObj *gluObject = NULL;
+
+	gluObject = gluNewQuadric();
+	gluQuadricDrawStyle (gluObject, GLU_FILL);
+	gluQuadricTexture (gluObject, true);		//does not shade nor texture well for a cone, zz debug
+	gluQuadricNormals (gluObject, GLU_SMOOTH);
+
+	//Making a display list
+	// mysphereID = glGenLists(1);
+	// glNewList(mysphereID, GL_COMPILE);
+
+	glPushMatrix();								//update to not use a pushMatrix, zz debug
+		glRotatef (180.0f, 0.0f, 0.0f, 1.0f);	//orient world texture for coord 0,0
+		gluCylinder (gluObject, 1.0, 0.0, 2.0, 24, 1);	//draw cone
+		glRotatef (180.0f, 1.0f, 0.0f, 0.0f);	//flips the disk over
+		gluDisk (gluObject, 0.0, 1.0, 24, 1);	//draw bottom disk
+	glPopMatrix();
+
+	// glEndList();
+	// gluDeleteQuadric(sphere);				``````````````//zz debug, should use this
+}
 
 //------------------------------------------------------------------------------
 GLuint npCreatePrimitiveDL(void)
 {
 	GLuint displayList = 0, i = 0;
 
+
 	// Create the id for the list
-	i = displayList = glGenLists (kNPprimitiveCount);
+	i = displayList = glGenLists (kNPgeoCount);
 
 	// start list
 	glNewList (i++, GL_COMPILE);
@@ -506,59 +681,59 @@ GLuint npCreatePrimitiveDL(void)
 	glEndList();
 
 	glNewList (i++, GL_COMPILE);
-		npGlutPrimitive (kNPglutWireSphere);
+		DrawSphereWireDL();					//using GLU for proper tex mapping
 	glEndList();
 
 	glNewList (i++, GL_COMPILE);
-		npGlutPrimitive (kNPglutSolidSphere);
+		DrawSphereDL();						//using GLU for proper tex mapping
 	glEndList();
 
 	glNewList (i++, GL_COMPILE);
-		npGlutPrimitive (kNPglutWireCone);
+		npGlutPrimitive (kNPgeoConeWire);
 	glEndList();
 
 	glNewList (i++, GL_COMPILE);
-		npGlutPrimitive(kNPglutSolidCone);
+		npGlutPrimitive (kNPgeoCone);		//GLU not very good cone tex mapping
 	glEndList();
 	
 	glNewList (i++, GL_COMPILE);
-		npGLWireTorus (0.15f, 1.5f, 7, 16);
+		npGLWireTorus (kNPtorusRadius * 0.1f, kNPtorusRadius, 7, 16);
 	glEndList();
 
 	glNewList (i++, GL_COMPILE);
-		npGLSolidTorus (0.15f, 1.5f, 7, 16);
+		npGLSolidTorus (kNPtorusRadius * 0.1f, kNPtorusRadius, 7, 16);
 	glEndList();
 
 	glNewList (i++, GL_COMPILE);
-		npGlutPrimitive (kNPglutWireDodecahedron);
+		npGlutPrimitive (kNPgeoDodecahedronWire);
 	glEndList();
 
 	glNewList (i++, GL_COMPILE);
-		npGlutPrimitive (kNPglutSolidDodecahedron);
+		npGlutPrimitive (kNPgeoDodecahedron);
 	glEndList();
 
 	glNewList (i++, GL_COMPILE);
-		npGlutPrimitive (kNPglutWireOctahedron);
+		npGlutPrimitive (kNPgeoOctahedronWire);
 	glEndList();
 
 	glNewList (i++, GL_COMPILE);
-		npGlutPrimitive (kNPglutSolidOctahedron);
+		npGlutPrimitive (kNPgeoOctahedron);
 	glEndList();
 
 	glNewList (i++, GL_COMPILE);
-		npGlutPrimitive (kNPglutWireTetrahedron);
+		npGlutPrimitive (kNPgeoTetrahedronWire);
 	glEndList();
 
 	glNewList (i++, GL_COMPILE);
-		npGlutPrimitive (kNPglutSolidTetrahedron);
+		npGlutPrimitive (kNPgeoTetrahedron);
 	glEndList();
 
 	glNewList (i++, GL_COMPILE);
-		npGlutPrimitive (kNPglutWireIcosahedron);
+		npGlutPrimitive (kNPgeoIcosahedronWire);
 	glEndList();
 
 	glNewList (i++, GL_COMPILE);
-		npGlutPrimitive (kNPglutSolidIcosahedron);
+		npGlutPrimitive (kNPgeoIcosahedron);
 	glEndList();
 
 	glNewList (i++, GL_COMPILE);
@@ -570,11 +745,11 @@ GLuint npCreatePrimitiveDL(void)
 	glEndList();
 
 	glNewList (i++, GL_COMPILE);
-		npGlutPrimitive (kNPglutWireTeapot);
+		DrawCylinderWireDL();
 	glEndList();
 
 	glNewList (i++, GL_COMPILE);
-		npGlutPrimitive (kNPglutSolidTeapot);
+		DrawCylinderDL();
 	glEndList();
 	
 	return (displayList);

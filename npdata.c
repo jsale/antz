@@ -28,6 +28,7 @@
 #include "io/npkey.h"
 #include "io/npfile.h"
 #include "io/npmouse.h"
+#include "io/npgl.h"
 #include "os/npos.h"
 
 void* gData;
@@ -71,8 +72,8 @@ void npInitDataMap(void* dataRef)
 	int i = 0;
 	pData data = (pData) dataRef;
 
-	NPnodePtr node = NULL;
-	NPnodePtr nodeChild = NULL;
+	pNPnode node = NULL;
+	pNPnode nodeChild = NULL;
 
 	npInitMessage (data);					//zz debug, need to move struct from IO
 	npInitMap (dataRef);
@@ -91,15 +92,10 @@ void npInitDataMap(void* dataRef)
 		nodeChild = npNodeNew (kNodeCamera, node, dataRef);
 		npDataCameraPreset (i, nodeChild, dataRef);
 	}
-	// select the first child camera
-//	npCtrlCommand (kNPcmdCamera, dataRef);		//zz debug, no ctrl commands until after ctrl inits
 
 	// root grid at index = 2
 	node = npNodeNew (kNodeGrid, NULL, dataRef);
 	node->textureID = 1;		// first texture is defualt for the root grid
-
-	// setup initial scene using preset 1
-	// npDataPreset (1, dataRef);
 
 	// select the camera
 	npSelectNode (data->map.node[kNPnodeRootCamera], dataRef);		//zz debug, no ctrl commands until after ctrl inits
@@ -257,14 +253,14 @@ void npInitDataTags (pNPtags tags, void* dataRef)
 	tags->recordCount = 0;
 
 
-	tags->list = (void*) malloc (kNPtagListMax * sizeof(void*));
+	tags->list = (void*) malloc (kNPtagDrawMax * sizeof(void*));
 	if (tags->list == NULL)
 	{
 		printf ("err 4278 - malloc failed to allocate tags node list\n");
 		exit(EXIT_FAILURE);
 	}
 
-	for (i=0; i < kNPtagListMax; i++)
+	for (i=0; i < kNPtagDrawMax; i++)
 			tags->list[i] = NULL;
 
 	tags->recordList = (void*) malloc (kNPrecordTagListMax * sizeof(void*));
@@ -281,11 +277,59 @@ void npInitDataTags (pNPtags tags, void* dataRef)
 }
 
 //------------------------------------------------------------------------------
-void npInitHUD(void* dataRef)
+void npInitTools (pNPnode root, void* dataRef)
+{
+	pData data = (pData) dataRef;
+	pNPhud hud = (pNPhud) &data->io.gl.hud;
+	pNPnode node = NULL;
+
+	//create the root HUD node
+	root = npNodeNew (kNodeHUD, 0, data);
+
+	//create the primary HUD branches
+	node = npNodeNew (kNodeHUD, root, data);	//reserved for future use
+		node->hudType = kNPhudNull;
+	node = npNodeNew (kNodeHUD, root, data);
+		node->hudType = kNPhudTags;
+	node = npNodeNew (kNodeHUD, root, data);
+		node->hudType = kNPhudSelection;
+	node = npNodeNew (kNodeHUD, root, data);
+		node->hudType = kNPhudConsole;
+	node = npNodeNew (kNodeHUD, root, data);
+		node->hudType = kNPhudFPS;
+	node = npNodeNew (kNodeHUD, root, data);
+		node->hudType = kNPhudCompass;
+		//make tilt and coordXYZ sub members of compass
+		node = npNodeNew (kNodeHUD, root, data);
+			node->hudType = kNPhudAngle;
+		node = npNodeNew (kNodeHUD, root, data);
+			node->hudType = kNPhudCoordX;
+		node = npNodeNew (kNodeHUD, root, data);
+			node->hudType = kNPhudCoordY;
+		node = npNodeNew (kNodeHUD, root, data);
+			node->hudType = kNPhudCoordZ;
+
+	node = npNodeNew (kNodeHUD, root, data);
+		node->hudType = kNPhudMode;
+		data->io.mouse.pickMode = kNPmodePin;		//needs to match npInitTools, zz debug, change init order?
+		npPostMode (node, data);					//had to include npgl.h, zz debug
+
+	node = npNodeNew (kNodeHUD, root, data);
+		node->hudType = kNPhudTool;
+		data->io.mouse.tool = kNPtoolCombo;			//needs to match npInitTools, zz debug
+		npPostTool (node, data);					//had to include npgl.h, zz debug
+
+	node = npNodeNew (kNodeHUD, root, data);
+		node->hudType = kNPhudCursor;
+}
+
+//------------------------------------------------------------------------------
+void npInitDataHUD (void* dataRef)
 {
 	pData data = (pData) dataRef;
 	pNPhud hud = (pNPhud) &data->io.gl.hud;
 
+	hud->root			= NULL;	
 	hud->drawTags		= true;
 	hud->drawCompass	= true;
 	hud->drawCoord		= true;
@@ -298,6 +342,7 @@ void npInitHUD(void* dataRef)
 	npInitDataTags (&hud->tags, dataRef);
 	npInitNodeConsole (&hud->console, dataRef);
 	npInitTextTag (&hud->fps, dataRef);
+	npInitTools (hud->root, dataRef);
 
 	hud->size = sizeof(NPhud);
 }
@@ -307,6 +352,8 @@ void npInitDataGL(void* dataRef)
 {
 	pData data = (pData) dataRef;
 	
+	int i = 0;
+
 	data->io.gl.normal = kNPglNormalize;
 	data->io.gl.shade = kNPglShadeSmooth; //kNPglShadeFlat; //works if starts Flat, debug zz
 	
@@ -326,9 +373,16 @@ void npInitDataGL(void* dataRef)
 	data->io.gl.fullScreen = false;
 	data->io.gl.stereo = false;
 
+	data->io.gl.openDialog = false;												//zz-osx
+	
 	data->io.gl.windowID = 0;
 
-	npInitHUD(data);
+	data->io.gl.linkQueCount = 0;
+
+	for (i=0; i < kNPlinkQueMax; i++)
+		data->io.gl.linkQue[i] = NULL;
+
+	npInitDataHUD(data);
 }
 
 //------------------------------------------------------------------------------
@@ -490,6 +544,10 @@ void npInitDataCtrl(void* dataRef)
 void npCloseData()
 {
 	pData data = (pData) gData;
+
+	printf("TEST!!!");
+
+	nposSleep(5.0);															//zz-osx debug
 	
 	free (data);
 }
@@ -543,9 +601,9 @@ void npDataPreset (int preset, void* dataRef)
 	NPfloatXYZ	scaleOffset;
 
 	pData data = (pData) dataRef;
-	NPnodePtr node = data->map.node[data->map.nodeRootIndex];
+	pNPnode node = data->map.node[data->map.nodeRootIndex];
 
-	NPnodePtr nodeChild = NULL;
+	pNPnode nodeChild = NULL;
 
 	NPpinPtr pinData = NULL;
 
@@ -841,9 +899,9 @@ void npDataPreset (int preset, void* dataRef)
 
 //resets the camera node passed in, specific to the preset number
 //------------------------------------------------------------------------------
-void npDataCameraPreset (int preset, NPnodePtr node, void* dataRef)
+void npDataCameraPreset (int preset, pNPnode node, void* dataRef)
 {
-	NPnodePtr nodeParent = NULL;
+	pNPnode nodeParent = NULL;
 	
 	// reset to defaults
 	// retains parameters node->id, node->branchLevel, node->parent...
@@ -909,8 +967,8 @@ void npPostMsg (char* message, int type, void* dataRef)
 	//add handling for type filtering, perhaps create a msg struct with type, debug zz
 
 #ifdef NDEBUG																//zz debug
-//	if (type == kNPmsgDebug)		//discard debug messages if NOT Debug build
-//		return;
+	if (type == kNPmsgDebug)		//discard debug messages if NOT Debug build
+		return;
 #endif
 
 	data->io.message.queIndex++;

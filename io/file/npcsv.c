@@ -199,7 +199,7 @@ void npCSVSetAttrib (int size, void* dataRef)
 
 //-----------------------------------------------------------------------------
 //passed an open State File and reads it in based on type
-void npCSVtoMap (FILE* file, int type, void*dataRef)
+void npCSVtoMap (FILE* file, int type, void* dataRef)
 {
 	size_t count = 0;
 	int i = 0;
@@ -207,7 +207,7 @@ void npCSVtoMap (FILE* file, int type, void*dataRef)
 	char* bufferIndex = 0;
 	
 	pData data = (pData) dataRef;
-	NPnodePtr node = NULL;
+	pNPnode node = NULL;
 
 
 	char* buffer = (char*)malloc(kNPmapFileBufferMax);
@@ -221,7 +221,7 @@ void npCSVtoMap (FILE* file, int type, void*dataRef)
 	{
 		printf("Reading File...\n");
 		count = npFileRead (buffer, 1, kNPmapFileBufferMax, file, dataRef);
-		printf("Bytes Read: %d\n", count);
+		printf("Bytes Read: %d\n", (int)count);								//zz-osx
 
 		npFileClose (file, dataRef);	//done reading, close file
 		

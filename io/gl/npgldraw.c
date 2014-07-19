@@ -32,17 +32,20 @@
 #include "../npglut.h"
 
 
-void DrawDefault (NPnodePtr node);
-void DrawCamera (NPnodePtr node);
-void DrawSurface (NPnodePtr node);
-void DrawPoints (NPnodePtr node);
-void DrawPin (int selected, NPnodePtr node, void* dataRef);
-void DrawPinChild (NPnodePtr node, void* dataRef);
-void DrawVideo (NPnodePtr node);
-void DrawGrid (NPnodePtr node, void* dataRef);
+void DrawDefault (pNPnode node);
+void DrawCamera (pNPnode node);
+void DrawSurface (pNPnode node);
+void DrawPoints (pNPnode node);
+void DrawPin (int selected, pNPnode node, void* dataRef);
+void DrawPinChild (pNPnode node, void* dataRef);
+void DrawVideo (pNPnode node);
+void DrawGrid (pNPnode node, void* dataRef);
 void npDrawSort (void* dataRef);
 NPfloatXYZ npProjectWorldToScreen (const pNPfloatXYZ offset);
 void npDrawNodeTags (void* dataRef);
+void DrawLink (pNPnode node, void* dataRef);
+void npProcessLinkQue (void* dataRef);
+void npFlagLink (pNPnode node, void* dataRef);
 
 //------------------------------------------------------------------------------
 void npInitGLDraw(void* dataRef)
@@ -56,7 +59,7 @@ void npInitGLDraw(void* dataRef)
 
 
 //------------------------------------------------------------------------------
-void DrawDefault (NPnodePtr node)
+void DrawDefault (pNPnode node)
 {
 	return;
 }
@@ -64,7 +67,7 @@ void DrawDefault (NPnodePtr node)
 
 // draw an icon at the location of the camera in the scene
 //------------------------------------------------------------------------------
-void DrawCamera (NPnodePtr node)
+void DrawCamera (pNPnode node)
 {
 	// draw icon of camera in the scene, but not the current viewport camera
 	return;
@@ -72,7 +75,7 @@ void DrawCamera (NPnodePtr node)
 
 
 //------------------------------------------------------------------------------
-void DrawSurface (NPnodePtr node)
+void DrawSurface (pNPnode node)
 {
 	// draw ground
 	glPushMatrix();
@@ -99,7 +102,7 @@ void DrawSurface (NPnodePtr node)
 
 
 //------------------------------------------------------------------------------
-void DrawPoints (NPnodePtr node)
+void DrawPoints (pNPnode node)
 {
 	return;
 }
@@ -130,7 +133,7 @@ int npRGBtoID( int r, int g, int b )
 
 //calculate screen position and add to tags draw list if on-screen
 //------------------------------------------------------------------------------
-void npAddTagToDraw (NPnodePtr node, void* dataRef)
+void npAddTagToDraw (pNPnode node, void* dataRef)
 {
 	pData data = (pData) dataRef;
 
@@ -147,21 +150,25 @@ void npAddTagToDraw (NPnodePtr node, void* dataRef)
 		return;
 
 	//add to tags draw list
-	if (data->io.gl.hud.tags.count < kNPtagListMax)
+	if (data->io.gl.hud.tags.count < kNPtagDrawMax)
 		data->io.gl.hud.tags.list[data->io.gl.hud.tags.count++] = node;
 }
 
 
 //------------------------------------------------------------------------------
-void DrawPin (int selectedRootNode, NPnodePtr node, void* dataRef)
+void DrawPin (int selectedRootNode, pNPnode node, void* dataRef)
 {
 	int i = 0;
 	int idRed = 0, idGrn = 0, idBlu = 0;
 
 	pData data = (pData) dataRef;
 
-	NPnodePtr nodeChild = data->map.currentNode;
-	NPnodePtr rootGrid = data->map.node[kNPnodeRootGrid];
+	pNPnode nodeChild = data->map.currentNode;
+	pNPnode rootGrid = data->map.node[kNPnodeRootGrid];
+
+	//for calculating world coordinates
+	NPcameraPtr camData = data->map.currentCam->data;
+	GLfloat modelView[16];
 
 	//if pickPass render scene with node ID encoded as color	//MB//
 	if( data->io.gl.pickPass )
@@ -177,56 +184,108 @@ void DrawPin (int selectedRootNode, NPnodePtr node, void* dataRef)
 
 	// position the node and scale the z position based on root grid scale
 	glTranslatef (node->translate.x, node->translate.y, 
-					node->translate.z * rootGrid->scale.z);
+					node->translate.z * rootGrid->scale.z);	//global grid height
 
-	// rotate
-	glRotatef (node->rotate.y, 0.0f, 0.0f, -1.0f);
-	glRotatef (node->rotate.x, -1.0f, 0.0f, 0.0f);
-	glRotatef (node->rotate.z, 0.0f, 0.0f, -1.0f);
+	// rotate to node orientation
+	glRotatef (node->rotate.y, 0.0f, 0.0f, -1.0f);		//heading
+	glRotatef (node->rotate.x, -1.0f, 0.0f, 0.0f);		//tilt
+	glRotatef (node->rotate.z, 0.0f, 0.0f, -1.0f);		//roll
 
-	//scale
-	glScalef (node->scale.x, node->scale.y, node->scale.z);
+	//set node scale, unless a rod topo
+	if ( node->topo != kNPtopoRod )
+		glScalef (node->scale.x, node->scale.y, node->scale.z);
 
 	glLineWidth (node->lineWidth);
 
 	//draw node
-	if (node->geometry == kNPprimitiveSolidPin)
+	if (node->topo == kNPtopoPin)
 	{
-		npGLSurface (true, node, data);	
-		glTranslatef (0.0f, 0.0f, 5.0f);			//should this be here, debug, zz
+		if (node->geometry == kNPgeoPin || node->geometry == kNPgeoPinWire)
+		{
+			npGLSurface (true, node, data);	
+			glTranslatef (0.0f, 0.0f, kNPoffsetPin);			//should this be here, debug, zz
+		}
+		else
+		{
+			glTranslatef (0.0f, 0.0f, kNPoffsetPin);			//should this be here, debug, zz
+			npGLSurface (true, node, data);	
+		}
+	}
+	else if ( node->topo == kNPtopoRod )	//special handling for rod
+	{					//width uses ratio, length uses scale 2 * 5 = 10
+		glPushMatrix();	
+			glScalef (	node->ratio * 2.0f, 
+						node->ratio * 2.0f, 
+						node->scale.z * kNPoffsetRod * 0.5f );
+			glTranslatef (0.0f, 0.0f, kNPoffsetUnit);
+			npGLSurface (true, node, data);
+		glPopMatrix();
+	}
+	else if ( node->topo == kNPtopoTorus)
+	{
+		glTranslatef (0.0f, 0.0f, kNPoffsetTorus);
+		npGLSurface (true, node, data);
+	}
+	else if ( node->topo == kNPtopoCube)
+	{
+		glTranslatef (0.0f, 0.0f, kNPoffsetCube);
+		npGLSurface (true, node, data);
 	}
 	else
 	{
-		glTranslatef (0.0f, 0.0f, 5.0f);
+		glTranslatef (0.0f, 0.0f, kNPoffsetUnit);
 		npGLSurface (true, node, data);
 	}
 
-	glLineWidth(1.0f);	//zz
-
-	if (node->selected || selectedRootNode)
+	//perhaps add logic to only calculate origin coordinates when needed, zz debug
+	//typically only need if cam target or connected by a link topo
+//	glGetFloatv (GL_MODELVIEW_MATRIX, modelView);
+	if (node->topo == kNPtopoRod)
 	{
+		glPushMatrix();
+			glTranslatef (0.0f, 0.0f, kNPoffsetRod * node->scale.z);
+			glGetFloatv (GL_MODELVIEW_MATRIX, modelView);
+			npLocalToWorld (&node->world, camData->inverseMatrix,  modelView);
+		glPopMatrix();
+	}
+	else
+	{
+		glGetFloatv (GL_MODELVIEW_MATRIX, modelView);
+		npLocalToWorld (&node->world, camData->inverseMatrix,  modelView);
+	}
+
+	//draw selection outline as wireframes
+	if (node->selected || selectedRootNode || data->map.selectedPinIndex)
+	{
+		glLineWidth(1.0f);
+
 		glPushMatrix();
 
 		if (selectedRootNode)
 		{
-			// slide down a little for scaling up to surround the pin
-			glTranslatef (0.0f, 0.0f, -5.10f);
-			glScalef (1.15f, 1.15f, 1.15f);
-
-			if ( node->selected )
+			// slide down a little extra for scaling up to surround the pin
+			if (node->topo == kNPtopoRod)	
 			{
-				if( !data->io.gl.pickPass )
+				glScalef (1.15f, 1.15f, (kNPoffsetRod/kNPoffsetPin) * node->scale.z); //rod is twice pin height	
+			}
+			else
+			{
+				glTranslatef (0.0f, 0.0f, -0.1f - kNPoffsetPin );
+				glScalef (1.15f, 1.15f, 1.15f);
+			}
+
+			if ( !data->io.gl.pickPass )
+			{
+				if (node->selected)
 					glColor4f (1.0f, 1.0f, 0.0f, 0.8f);	// draw selected yellow
-				npGLPrimitive (kNPprimitiveWirePin, 0.0f);
+				else if (node == data->map.currentNode)
+						glColor4f ( 1.0f, 0.0f, 0.0f, 1.0f);	// current node red
+				else
+					glColor4f ( 0.5f, 0.5f, 0.5f, 0.7f);	// grey
 			}
-			else if (node->branchLevel == 0)
-			{
-				if( !data->io.gl.pickPass )
-					glColor4f ( 1.0f, 0.0f, 0.0f, 1.0f);	// current node red
-				npGLPrimitive (kNPprimitiveWirePin, 0.0f);
-			}
+			npGLPrimitive (kNPgeoPinWire, 0.0f);	//draw surrounding outline
 
-			if (node->branchLevel > 0 && !data->io.gl.pickPass)
+			if (!data->io.gl.pickPass)
 			{
 				if (nodeChild->selected)									//zz debug
 					glColor4f (1.0f, 1.0f, 0.0f, 0.8f);	// draw selected yellow
@@ -234,18 +293,28 @@ void DrawPin (int selectedRootNode, NPnodePtr node, void* dataRef)
 					glColor4f (1.0f, 0.0f, 0.0f, 1.0f);	// current node red
 			}
 
-			glTranslatef (0.0f, 0.0f, 5.0f);
-			glScalef (1.0f, 1.0f, 0.66666667f);				// squish height, z 
-			npGLPrimitive (kNPprimitiveWirePin, 0.0f);	// 2nd one will be above
+			if (node->topo == kNPtopoRod)	
+			{
+				glTranslatef (0.0f, 0.0f, kNPoffsetPin);
+				glScalef (1.0f, 1.0f, 0.66666667f / (2.0f * node->scale.z));	// squish z height
+			}
+			else
+			{
+				glTranslatef (0.0f, 0.0f, kNPoffsetPin);
+				glScalef (1.0f, 1.0f, 0.66666667f);			// squish z height
+			}
+
+			npGLPrimitive (kNPgeoPinWire, 0.0f);		// 2nd one is above node
 		}
 		else if (node->selected)
 		{
 			if( !data->io.gl.pickPass )
 				glColor4f (1.0f, 1.0f, 0.0f, 0.8f);		// draw selected as yellow
 
-			glTranslatef (0.0f, 0.0f, -5.10f);
+			if (node->topo != kNPtopoRod)	
+				glTranslatef (0.0f, 0.0f, -0.1f - kNPoffsetPin );
 			glScalef (1.05f, 1.05f, 1.05f);
-			npGLPrimitive (kNPprimitiveWirePin, 0.0f);
+			npGLPrimitive (kNPgeoPinWire, 0.0f);
 		}
 
 		glPopMatrix();
@@ -255,7 +324,7 @@ void DrawPin (int selectedRootNode, NPnodePtr node, void* dataRef)
 	if (node->tagMode)
 	{
 		glPushMatrix();
-			glTranslatef (0.0f, 0.0f, -5.0f);
+			glTranslatef (0.0f, 0.0f, -kNPoffsetPin);
 			npAddTagToDraw (node, data);
 		glPopMatrix();
 	}
@@ -269,33 +338,43 @@ void DrawPin (int selectedRootNode, NPnodePtr node, void* dataRef)
 	glPopMatrix();
 }
 
-
 // first draw child here, then break it up, draw nodes should iterate down, debug, zz
 // the tree branches and take care of selected glows, etc...
 // this routine should be generic regardless of branch level
 //------------------------------------------------------------------------------
 #define kNPinvertDeg 0.005555555555f	//equals 1/180
 
-void DrawPinChild (NPnodePtr node, void* dataRef)
+void DrawPinChild (pNPnode node, void* dataRef)
 {
 	int i = 0;
 	int idRed = 0, idGrn = 0, idBlu = 0;
 
+	GLfloat modelView[16];													//zz-link
+
 	pData data = (pData) dataRef;
 
-	NPnodePtr parent = node->parent;
+	NPcameraPtr camData = data->map.currentCam->data;						//zz-link
+	pNPnode parent = node->parent;
 	NPpinPtr nodeData = (NPpinPtr) node->data;
 
-	if (parent == NULL)								//take this out		debug zz	
+	
+	//link nodes drawn separately from pins after both ends rendered
+	if (node->type == kNodeLink)
+	{
+		npFlagLink (node, dataRef);			//drawn after both endpoint nodes
+		return;
+	}
+
+	if (parent == NULL)									//take this out		debug zz	
 		return;
 
 	glPushMatrix();
 
-	//Main Color for Rendering Pin
+	//node ID is encoded on the Pixel! In RGB Triplet (Range: 0-16.7 Million)
 	if( data->io.gl.pickPass )
 	{
 		npIDtoRGB( node->id, &idRed, &idGrn, &idBlu );
-		glColor4ub( idRed, idGrn, idBlu, 255 );	//ID of Node is encoded on the Pixel! In RGB Triplet   (Range: 0-  16.7 Million)
+		glColor4ub( idRed, idGrn, idBlu, 255 );
 	}
 	else
 		glColor4ub (node->color.r, node->color.g, node->color.b, node->color.a);
@@ -340,9 +419,9 @@ void DrawPinChild (NPnodePtr node, void* dataRef)
 				break;
 			default : break;
 		}
-		glTranslatef (0.0f, 0.0f, kNPcubeLength);	//translate from center to cube surface, explain, debug zz
-		glScalef (kNPinvertDeg * kNPcubeLength, kNPinvertDeg * kNPcubeLength, 
-					kNPinvertDeg * kNPcubeLength); //scale face +/- 180 deg
+		glTranslatef (0.0f, 0.0f, kNPoffsetCube);	//translate from center to cube surface, explain, debug zz
+		glScalef (kNPinvertDeg * kNPoffsetCube, kNPinvertDeg * kNPoffsetCube, 
+					kNPinvertDeg * kNPoffsetCube); //scale face +/- 180 deg
 		
 		//now position node specific coordinates
 		glTranslatef (node->translate.x, node->translate.y, node->translate.z);
@@ -352,8 +431,11 @@ void DrawPinChild (NPnodePtr node, void* dataRef)
 		glRotatef (node->rotate.z, 0.0f, 0.0f, -1.0f);
 	//	glRotatef (node->rotate.z * kRADtoDEG, 0.0f, 0.0f, 1.0f);
 
-		glScalef (90.0f / kNPcubeLength, 90.0f / kNPcubeLength, 90.0f / kNPcubeLength);	//scale node up to half parent size
-		glScalef (node->scale.x, node->scale.y, node->scale.z);	//node scale
+		//scale node up to half parent size
+		glScalef (90.0f / kNPoffsetCube, 90.0f / kNPoffsetCube, 90.0f / kNPoffsetCube);
+		
+		if (node->topo != kNPtopoRod)		 //rod is scaled at draw time and does not pass along scale to children
+			glScalef (node->scale.x, node->scale.y, node->scale.z);	//node scale
 	}
 	else if (parent->topo == kNPtopoSphere)
 	{
@@ -370,45 +452,56 @@ void DrawPinChild (NPnodePtr node, void* dataRef)
 		glRotatef (node->rotate.x, -1.0f, 0.0f, 0.0f);
 		glRotatef (node->rotate.z, 0.0f, 0.0f, -1.0f);
 
-		//scale 1/2 size of parent
-		glScalef (node->scale.x * 0.25f, node->scale.y * 0.25f,
-					node->scale.z * 0.25f);	//node scale
+		//scale 1/4 size of parent
+		if (node->topo == kNPtopoRod)		 //rod is scaled at draw time and does not pass along scale to children
+			glScalef (0.25f, 0.25f, 0.25f);
+		else
+			glScalef (node->scale.x * 0.25f, node->scale.y * 0.25f, 
+						node->scale.z * 0.25f);	//node scale
 //		glScalef (node->scale.x * 0.3536f, node->scale.y * 0.3536f,
 //					node->scale.z * 0.3536f);	//node scale
 	}
-	else if (parent->topo == kNPtopoPin )
-		//|| ( parent->topo == 0 && parent->geometry == kNPglutWireTorus) )	//default
+	else if (parent->topo == kNPtopoCylinder)
+	{
+		//position object
+		glRotatef (node->translate.x + 180.0f, 0.0f, 0.0f, 1.0f);	//longitude, +180 so N = 0
+		glRotatef (90.0f, 1.0f, 0.0f, 0.0f);	//orient perpendicular to cyl
+		
+		//latitude plus translate 1 unit to surface adding converted node z local units
+		glTranslatef (0.0, node->translate.y / 90.0f,
+						1.0f + node->translate.z / (4.0f*kRADtoDEG) );
+		
+		//orientation
+		glRotatef (node->rotate.y, 0.0f, 0.0f, -1.0f);
+		glRotatef (node->rotate.x, -1.0f, 0.0f, 0.0f);
+		glRotatef (node->rotate.z, 0.0f, 0.0f, -1.0f);
+
+		//scale 1/4 size of parent
+		if (node->topo == kNPtopoRod)		 //rod is scaled at draw time and does not pass along scale to children
+			glScalef (0.25f, 0.25f, 0.25f);
+		else
+			glScalef (node->scale.x * 0.25f, node->scale.y * 0.25f, node->scale.z * 0.25f);			//node scale
+	}
+	else if ( parent->topo == kNPtopoPin || parent->topo == kNPtopoRod )
 	{
 		//position the node vertically on the pin, note using translate.x
-		if (node->branchLevel == 1)
-		{
-			glTranslatef (0.0f, 0.0f, node->translate.x / 37.22f);
-
-			if ( node->topo == kNPtopoPin)// || (node->topo == 0 ))
-				glScalef (node->scale.x * 0.5f, node->scale.y * 0.5f, node->scale.z * 0.5f);
-			else
-				glScalef (node->scale.x, node->scale.y, node->scale.z);
-		}
+		if (node->branchLevel == 1 && parent->topo != kNPtopoRod)
+			glTranslatef (0.0f, 0.0f, node->translate.x / 37.22f);	//root pin workaround, zz debug
+		else if (parent->topo == kNPtopoRod)	//replace kNPoffsetPin with
+			glTranslatef (0.0f, 0.0f, 
+				parent->scale.z * (kNPoffsetRod + 2.0f * node->translate.x / 37.22f) );
 		else
-		{
-			glTranslatef (0.0f, 0.0f, kNPpinHeight + node->translate.x / 37.22f);
+			glTranslatef (0.0f, 0.0f, kNPoffsetPin + node->translate.x / 37.22f);
 
-			//scale by node size and additional factor to reduce size
-			if ( node->topo == kNPtopoPin)// || (node->topo == 0 ))
-				glScalef (node->scale.x * 0.5f, node->scale.y * 0.5f, node->scale.z * 0.5f);
-			else
-				glScalef (node->scale.x, node->scale.y, node->scale.z);
-		}
-
+		if ( node->topo == kNPtopoPin && parent->topo == kNPtopoPin )
+			glScalef (node->scale.x * 0.5f, node->scale.y * 0.5f, node->scale.z * 0.5f);
+		else if (node->topo != kNPtopoRod)		 //rod is scaled at draw time and does not pass along scale to children
+			glScalef (node->scale.x, node->scale.y, node->scale.z);	//rod does not scale child
+	
 		//offset from center after scaling, preserves ring offset when scaling
 		glTranslatef (node->translate.z * .008333333f, //kRADtoDEG,	//scale 180 to ground
 					 0.0f, 0.0f); // node->translate.y / -37.22f, 0.0f); //locked y, makes more sense when swtiching topos
 
-//		if (parent->topo == kNPtopoPin)
-//			glRotatef (90.0f, 0.0f, 0.0f, 1.0f);
-
-		//rotate
-	//	glRotatef (90.0f, 0.0f, 0.0f ,1.0f);	//orient x = 0 to north
 		glRotatef (node->rotate.y, 0.0f, 0.0f, -1.0f);
 		glRotatef (node->rotate.x, -1.0f, 0.0f, 0.0f);
 		glRotatef (node->rotate.z, 0.0f, 0.0f, -1.0f);
@@ -427,9 +520,7 @@ void DrawPinChild (NPnodePtr node, void* dataRef)
 //		glRotatef (90.0f, 1.0f, 0.0f, 0.0f);
 		
 		//treat null as torus, later make this depend on the geometry
-		if (node->topo == kNPtopoTorus || node->topo == 0)
-	//		|| node->geometry == kNPglutWireTorus
-	//		|| node->geometry == kNPglutSolidTorus )
+		if (node->topo == kNPtopoTorus)
 		{
 			glRotatef (90.0f, 1.0f, 0.0f, 0.0f);
 			glRotatef (-90.0f, 0.0f, 0.0f, 1.0f);
@@ -446,19 +537,10 @@ void DrawPinChild (NPnodePtr node, void* dataRef)
 			glRotatef (90.0f, 0.0f, 0.0f, 1.0f);				//orient North
 			//translate 1 unit to surface then convert node z local units
 			//uses parent->ratio for torus inner radius and 1.5f for scaling factor
-			if (node->topo == kNPtopoPin)// || node->geometry == kNPprimitiveSolidPin) // kNPtopoTorus zz
-			{
-				glTranslatef ( 0.0f, 0.0f,
-					parent->ratio + (node->translate.z / kRADtoDEG) );
-	//			glRotatef (node->translate.y, 0.0f, -1.0f, 0.0f);	//latitude
-				glScalef (0.5f, 0.5f, 0.5f);	//results in 1/4 parent
-			}
-			else //if (node->topo == kNPtopoNull)
-			{
-				glTranslatef (0.0f, 0.0f, node->translate.z / kRADtoDEG);
-//				glRotatef (node->translate.y, 0.0f, -1.0f, 0.0f);	//latitude
-			}
+			glTranslatef ( 0.0f, 0.0f,
+					parent->ratio + (node->translate.z / (k2PI * kRADtoDEG)) );
 
+			glScalef (0.5f, 0.5f, 0.5f);	//results in 1/4 parent
 		}
 		//orientation
 		glRotatef (node->rotate.y, 0.0f, 0.0f, -1.0f);
@@ -466,7 +548,10 @@ void DrawPinChild (NPnodePtr node, void* dataRef)
 		glRotatef (node->rotate.z, 0.0f, 0.0f, -1.0f);
 
 		//scale 1/2 size of parent, smaller is good for torus .5 / 1.5
-		glScalef (node->scale.x * 0.33333333f, node->scale.y * 0.33333333f,
+		if (node->topo == kNPtopoRod)		 //rod is scaled at draw time and does not pass along scale to children
+			glScalef (0.33333333f, 0.33333333f, 0.33333333f);
+		else
+			glScalef (node->scale.x * 0.33333333f, node->scale.y * 0.33333333f,
 					node->scale.z * 0.33333333f);	//node scale
 
 /*
@@ -485,7 +570,7 @@ void DrawPinChild (NPnodePtr node, void* dataRef)
 		glScalef ( 0.5f * node->scale.x, 0.5f * node->scale.y, 0.5f * node->scale.z);
 */	
 	}
-//	else if(node->geometry == kNPprimitiveSolidPin)// process pins, DrawPin(node, dataRef);
+//	else if(node->geometry == kNPgeoPin)// process pins, DrawPin(node, dataRef);
 //	{
 //		DrawPin (false, node, dataRef);
 //	}	
@@ -493,7 +578,7 @@ void DrawPinChild (NPnodePtr node, void* dataRef)
 	{
 		if (node->branchLevel == 1)
 		{
-			if (parent->topo == 0 || parent->topo == kNPtopoPin)
+			if (parent->topo == kNPtopoPin || parent->topo == kNPtopoRod )
 			{	
 				glTranslatef (0.0f, 0.0f, node->translate.x / 37.22f);
 				if (node->topo == kNPtopoPin)
@@ -525,31 +610,76 @@ void DrawPinChild (NPnodePtr node, void* dataRef)
 		glRotatef (node->rotate.x, -1.0f, 0.0f, 0.0f);
 		glRotatef (node->rotate.z, 0.0f, 0.0f, -1.0f);
 		
-		glScalef (node->scale.x, node->scale.y, node->scale.z);	//root child
+		if (node->topo != kNPtopoRod)		 //rod is scaled at draw time and does not pass along scale to children
+			glScalef (node->scale.x, node->scale.y, node->scale.z);	//root child
 	}
 
+	//offset height to keep object at the surface, several exceptions...
+	if ( parent->topo != kNPtopoPin && parent->topo != kNPtopoRod )
+	{
+		if ( node->topo == kNPtopoCube )
+			glTranslatef (0.0f, 0.0f, kNPoffsetCube);
+		else if ( node->topo == kNPtopoTorus )
+		{
+			if ( parent->topo != kNPtopoTorus )
+				glTranslatef (0.0f, 0.0f, kNPoffsetTorus);
+		}
+		else if ( node->topo != kNPtopoPin && node->topo != kNPtopoRod )
+			glTranslatef (0.0f, 0.0f, kNPoffsetUnit);
+	}
+
+	//update the world coordinates of the node
+	//perhaps add logic to only calculate origin coordinates when needed,	 zz debug
+	//typically only need if cam target or connected by a link topo
+	if (node->topo == kNPtopoPin)
+	{
+		glPushMatrix();
+			glTranslatef (0.0f, 0.0f, kNPoffsetPin * node->scale.z);	//inverted position with negative scale, zz debug
+			glGetFloatv (GL_MODELVIEW_MATRIX, modelView);				//for some reason the rod does not have same issue
+			npLocalToWorld (&node->world, camData->inverseMatrix,  modelView);
+		glPopMatrix();
+	}
+	else if (node->topo == kNPtopoRod)
+	{
+		glPushMatrix();
+			glTranslatef (0.0f, 0.0f, kNPoffsetRod * node->scale.z);
+			glGetFloatv (GL_MODELVIEW_MATRIX, modelView);
+			npLocalToWorld (&node->world, camData->inverseMatrix,  modelView);
+		glPopMatrix();
+	}
+	else
+	{
+		glGetFloatv (GL_MODELVIEW_MATRIX, modelView);
+		npLocalToWorld (&node->world, camData->inverseMatrix,  modelView);
+	}
+
+//	if (!node->hide)
+//		printf("%d %6.2f %6.2f %6.2f\n", node->branchLevel,											//zz-link
+//			node->world.x,  node->world.y,  node->world.z );
 
 	// draw the node unless hidden
 	if (!node->hide)
 	{
 		glLineWidth(node->lineWidth);
 
-		if (node->branchLevel > 1)
+		if ( node->topo == kNPtopoPin
+			&& !(node->geometry == kNPgeoPin || node->geometry == kNPgeoPinWire) )
 		{
-			if (node->topo == kNPtopoPin && node->geometry != kNPprimitiveSolidPin)
-			{
-				glTranslatef (0.0f, 0.0f, 5.0f);
+			glTranslatef (0.0f, 0.0f, kNPoffsetPin);
+			npGLSurface (true, node, data);
+			glTranslatef (0.0f, 0.0f, -kNPoffsetPin);
+		}
+		else if ( node->topo == kNPtopoRod )
+		{					//width uses ratio, length uses scale 2 * 5 = 10
+			glPushMatrix();
+				glScalef (node->ratio * 2.0f, node->ratio * 2.0f, 
+							node->scale.z * kNPoffsetPin);
+				glTranslatef (0.0f, 0.0f, kNPoffsetUnit);
 				npGLSurface (true, node, data);
-				glTranslatef (0.0f, 0.0f, -5.0f);
-			}
-			else
-			{
-				npGLSurface (true, node, data);
-			//	glTranslatef (0.0f, 0.0f, 5.0f);
-			}
+			glPopMatrix();
 		}
 		else
-			npGLSurface (true, node, data);	
+			npGLSurface (true, node, data);	//default for all other topo types
 
 		glLineWidth(1.0f);
 	}
@@ -560,9 +690,9 @@ void DrawPinChild (NPnodePtr node, void* dataRef)
 		glPushMatrix();
 			// draw nodeID color on pickPass to allow picking on the wireframe
 			if( !data->io.gl.pickPass )
-				glColor4f (0.8f, 0.8f, 0.0f, 1.0f);			//draw yellow
+				glColor4f (1.0f, 1.0f, 0.0f, 0.8f);			//draw yellow
 			glScalef (1.03f, 1.03f, 1.03f);
-			npGLPrimitive (kNPglutWireTorus, node->ratio);
+			npGLPrimitive (kNPgeoTorusWire, node->ratio);
 		glPopMatrix();
 	}
 
@@ -579,7 +709,7 @@ void DrawPinChild (NPnodePtr node, void* dataRef)
 					glColor4f (1.0f, 0.0f, 0.0f, 1.0f);		//draw red
 			}
 			glScalef (1.04f, 1.04f, 1.04f);
-			npGLPrimitive (kNPglutWireTorus, node->ratio);
+			npGLPrimitive (kNPgeoTorusWire, node->ratio);
 		glPopMatrix();
 	}
 	
@@ -594,16 +724,180 @@ void DrawPinChild (NPnodePtr node, void* dataRef)
 	glPopMatrix();
 }
 
+// first draw child here, then break it up, draw nodes should iterate down, debug, zz
+// the tree branches and take care of selected glows, etc...
+// this routine should be generic regardless of branch level
+//------------------------------------------------------------------------------
+#define kNPinvertDeg 0.005555555555f	//equals 1/180
+
+void DrawLink (pNPnode node, void* dataRef)
+{
+	int i = 0;
+	int idRed = 0, idGrn = 0, idBlu = 0;
+
+//	GLfloat modelView[16];											//zz-link
+
+	GLfloat distance = 0.0f;
+	GLfloat rotZ = 0.0f;
+	GLfloat rotX = 0.0f;
+	NPfloatXYZ vec;
+	NPfloatXYZ unitVec;
+	char msg[128];
+
+	pData data = (pData) dataRef;
+
+	pNPnode parent = node->parent;		//link A
+	pNPnode child = node->child[0];		//link B
+
+	if (parent == NULL)
+	{
+		sprintf(msg,"err 7422 - link A is null, link id: %d", node->id);
+		npPostMsg (msg, kNPmsgErr, data);
+		return;
+	}
+	if (child == NULL)
+	{
+		sprintf(msg,"err 7422 - link B is null, link id: %d", node->id);
+		npPostMsg (msg, kNPmsgErr, data);
+		return;
+	}
+
+	//don't draw if node or ends hidden
+	if (node->hide || parent->hide || child->hide)
+		return;
+
+	vec.x = parent->world.x - child->world.x;
+	vec.y = parent->world.y - child->world.y;
+	vec.z = parent->world.z - child->world.z;
+	
+												//optimize to use a lookup table, zz debug
+	distance = sqrtf(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+
+	//calculate the unit vector
+	unitVec.x = vec.x / distance;
+	unitVec.y = vec.y / distance;	
+	unitVec.z = vec.z / distance;
+
+	//provide the node coords for camera auto-centering
+	node->world.x = parent->world.x - vec.x * 0.5f;
+	node->world.y = parent->world.y - vec.y * 0.5f;
+	node->world.z = parent->world.z - vec.z * 0.5f;
+
+	//if pickPass then set the ID color, otherwise use node color
+	if (data->io.gl.pickPass)
+	{	
+		npIDtoRGB (node->id, &idRed, &idGrn, &idBlu);
+		glColor4ub (idRed, idGrn, idBlu, 255);		//set color mapped as id
+	}
+	else
+		glColor4ub (node->color.r, node->color.g, node->color.b, node->color.a);
+
+	glPushMatrix();
+
+	glTranslatef (parent->world.x, parent->world.y, parent->world.z);
+
+	//draw center line, kinda nice look and helps aliasing when cam far away
+	glLineWidth (node->lineWidth);	//also effects wireframe version of geometry
+
+	glBegin (GL_LINES);
+		glVertex3f (0.0f, 0.0f, 0.0f);
+		glVertex3f (-vec.x, -vec.y, -vec.z);
+	glEnd();
+
+		//update to orient the object using a rotation matrix and avoid sin, zz debug
+	//orient using the unitVec, optimize this not need trig functions
+	rotZ = atan2f (unitVec.y, unitVec.x);
+	rotX = asinf (unitVec.z);
+
+	glRotatef (rotZ * kRADtoDEG - 90.0f, 0.0f, 0.0f, 1.0f);
+	glRotatef (rotX * kRADtoDEG + 90.0f, 1.0f, 0.0f, 0.0f);
+
+	//scale the width using ratio and length is half the distance
+	glScalef (node->ratio, node->ratio, distance * 0.5f);	//cyl is 2 units
+
+	//offset to the end of the cylinder instead of its center
+	glTranslatef (0.0f, 0.0f, kNPoffsetUnit);
+
+	//draw the rod, default geometry = kNPgeoCylinder
+	npGLSurface (true, node, data);	
+
+	//if tagMode then calculate screen position and add to tags draw list
+	if (node->tagMode)
+		npAddTagToDraw(node, data);
+
+	glScalef (1.1f, 1.1f, 1.4142f);	//z scaled for cube to be 2 units
+
+	if (node->selected)
+	{
+		glColor4ub (255, 255, 0, 204);				//yellow if selected
+		npGLPrimitive (kNPgeoCubeWire, 0.0f);
+//		glRotatef (45.0f, 0.0f, 0.0f, 1.0f);		//offset 2nd draw
+//		npGLPrimitive (kNPgeoCubeWire, 0.0f);		//drawn twice
+	}
+
+	if (node == data->map.currentNode)
+	{
+		glColor4ub (255, 0, 0, 255);				//red if active
+		glRotatef (22.0f, 0.0f, 0.0f, 1.0f);		//offset from selected
+		npGLPrimitive (kNPgeoCubeWire, 0.0f);
+	//	glRotatef (45.0f, 0.0f, 0.0f, 1.0f);
+	//	npGLPrimitive (kNPgeoCubeWire, 0.0f);
+	}
+
+	glPopMatrix();
+}
 
 //------------------------------------------------------------------------------
-void DrawVideo (NPnodePtr node)
+void npProcessLinkQue (void* dataRef)
+{
+	pData data = (pData) dataRef;
+
+	int i = 0;
+
+	for (i=0; i < data->io.gl.linkQueCount; i++)
+	{
+		DrawLink (data->io.gl.linkQue[i], data);	//draw the link
+		data->io.gl.linkQue[i] = NULL;				//clears the que
+	}
+
+	data->io.gl.linkQueCount = 0;					//clears the que
+}
+
+//first time called we set the link node flag to indicate one end is rendered
+//second time we add to the link queue to render after the second pin is done
+//links need both ends rendered first to know the world coordinates of the ends
+//------------------------------------------------------------------------------
+void npFlagLink (pNPnode node, void* dataRef)
+{
+	pData data = (pData) dataRef;
+
+	if (!node->linkFlag)
+	{
+		node->linkFlag = true;
+		return;
+	}
+
+	node->linkFlag = false; //reset the flag for next pass
+
+	if (data->io.gl.linkQueCount > kNPlinkQueMax)
+	{
+		npPostMsg("err 6289 - kNPlinkQueMax exceeded", kNPmsgErr, data);
+		return;
+	}
+
+	//add the link to the que to be drawn after current root pin is rendered
+	data->io.gl.linkQue[data->io.gl.linkQueCount++] = node;
+}
+
+//------------------------------------------------------------------------------
+void DrawVideo (pNPnode node)
 {
 	return;
 }
 
 
 //------------------------------------------------------------------------------
-void DrawGrid (NPnodePtr node, void* dataRef)
+void DrawGrid (pNPnode node, void* dataRef)
 {
 	int			i = 0;
 	int			j = 0;
@@ -617,16 +911,24 @@ void DrawGrid (NPnodePtr node, void* dataRef)
 
 	pData data = (pData) dataRef;
 	NPgridPtr grid = (NPgridPtr) node->data;
-	NPnodePtr camNode = data->map.activeCam;
+	pNPnode camNode = data->map.currentCam;
 
 	//MB-TEXTURE
-	static GLfloat sgenparams[] = { 1.0f,  0.0,  0.0,  0.0 };
-	static GLfloat tgenparams[] = { 0.0,  1.0f,  0.0,  0.0 };
+	const GLfloat sgenparams[] = { 1.0f, 0.0f, 0.0f, 0.0f };
+	const GLfloat tgenparams[] = { 0.0f, 1.0f, 0.0f, 0.0f };
 	//MB-END
 
 	//if pickPass then don't draw grid
-	if (data->io.gl.pickPass)// && data->map.nodeRootIndex != kNPnodeRootGrid) debug, zz
+	if (data->io.gl.pickPass && data->io.mouse.pickMode != kNPmodeGrid) //debug, zz
 		return;
+
+	//if pickPass then set the ID color
+	if (data->io.gl.pickPass)
+	{	
+		npIDtoRGB (node->id, &idRed, &idGrn, &idBlu);
+		printf("r: %d   g: %d   b: %d\n", idRed, idGrn, idBlu);
+		glColor4ub (idRed, idGrn, idBlu, 255);		//set color mapped as id
+	}
 
 	//turn two-sided rendering of polygon faces on
 	if (node->branchLevel > 0)
@@ -636,32 +938,11 @@ void DrawGrid (NPnodePtr node, void* dataRef)
 	
 	glPushMatrix();				//restore after calling child nodes
 
-	//if not pickPass then enable texture mapping
-	if (!data->io.gl.pickPass)
-	{
-		glEnable ( GL_TEXTURE_2D );
-		glBindTexture ( GL_TEXTURE_2D, node->textureID );
-		//using GL_MODULATE instead of GL_DECAL to allow alpha with RGBA textures
-		glTexEnvf( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE );
-		glTexGeni( GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR );
-		glTexGeni( GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR );
-		glDisable( GL_TEXTURE_GEN_S );
-		glDisable( GL_TEXTURE_GEN_T );
-		glTexGenfv( GL_S, GL_OBJECT_PLANE, sgenparams );
-		glTexGenfv( GL_T, GL_OBJECT_PLANE, tgenparams );
-	}
-	else
-	{	// if pickPass then no texturing and set color by id
-		npIDtoRGB (node->id, &idRed, &idGrn, &idBlu);
-		printf("r: %d   g: %d   b: %d\n", idRed, idGrn, idBlu);
-		glColor4b (idRed, idGrn, idBlu, 255);		//draw quad color mapped as id
-	}
-
 	//used to calculate grid center based on segment count and spacing
 	length.x = grid->spacing.x * node->segments.x;
 	length.y = grid->spacing.y * node->segments.y;
 
-	// position node
+	//position, rotate and scale node
 	glTranslatef (node->translate.x, node->translate.y, node->translate.z);
 
 	glRotatef (node->rotate.y, 0.0f, 0.0f, -1.0f);
@@ -673,9 +954,8 @@ void DrawGrid (NPnodePtr node, void* dataRef)
 	//center based on length
 	glTranslatef (length.x * -0.5f, length.y * -0.5f, 0.0f);
 
-
-	//Draw Texture Quad
-	if (node->textureID)	//allow for click on background tex's for mouse flying
+	//draw texture quad
+	if (node->textureID || data->io.gl.pickPass)	//allow for click on background tex's for mouse flying
 	{
 		//if not pickPass then enable and bind texture, set color to white
 		if (!data->io.gl.pickPass)
@@ -683,17 +963,44 @@ void DrawGrid (NPnodePtr node, void* dataRef)
 			if (node->branchLevel > 0)	//child grids use opacity for textures
 				glColor4ub (255, 255, 255, node->color.a);
 			else
-				glColor4f (1.0f, 1.0f, 1.0f, 1.0f);	 //root grid is fully opaque
+				glColor4ub (255, 255, 255, 255);	 //root grid is fully opaque
+
+			glEnable ( GL_TEXTURE_2D );
+			glBindTexture ( GL_TEXTURE_2D, node->textureID );
+
+			//using GL_MODULATE instead of GL_DECAL to allow alpha with RGBA textures
+			glTexEnvf( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE );
+
+			glTexGeni( GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR );
+			glTexGeni( GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR );
+
+			glDisable( GL_TEXTURE_GEN_S );
+			glDisable( GL_TEXTURE_GEN_T );
+
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP );
+			glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP );
+			
+			//rather sharp setting, but probably best for mapping
+			//for video use GL_LINEAR_MIPMAP_NEAREST when the angle is close 
+			//to perpendicular less artifacts and a bit more blurry
+	//		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST_MIPMAP_NEAREST);		//zz debug, add mipmapping...
+	//		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);		//zz debug, add mipmapping...
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+			glTexGenfv( GL_S, GL_OBJECT_PLANE, sgenparams );
+			glTexGenfv( GL_T, GL_OBJECT_PLANE, tgenparams );
 		}
 
 		//draw the quad
 		glBegin (GL_QUADS);
-			glTexCoord2d(0.0,0.0); glVertex3d(0.0f,  0.0f, gridOffset);	 // center quad
-			glTexCoord2d(1.0,0.0); glVertex3d(length.x, 0.0f, gridOffset);
-			glTexCoord2d(1.0,1.0); glVertex3d(length.x, length.y, gridOffset);
-			glTexCoord2d(0.0,1.0); glVertex3d(0.0f,  length.y, gridOffset);
+			glTexCoord2f(0.0f,0.0f); glVertex3f(0.0f,  0.0f, gridOffset);	 // center quad
+			glTexCoord2f(1.0f,0.0f); glVertex3f(length.x, 0.0f, gridOffset);
+			glTexCoord2f(1.0f,1.0f); glVertex3f(length.x, length.y, gridOffset);
+			glTexCoord2f(0.0f,1.0f); glVertex3f(0.0f,  length.y, gridOffset);
 		glEnd();
-
+		
 		glDisable ( GL_TEXTURE_2D );
 	}
 
@@ -739,7 +1046,7 @@ void DrawGrid (NPnodePtr node, void* dataRef)
 					// restore node color 
 					glColor4ub (node->color.r, node->color.g, node->color.b, node->color.a);
 				}
-
+		
 				for (j=0; j <= node->segments.x; j++)
 				{
 					glVertex3f (x, 0.0f, z);
@@ -776,7 +1083,10 @@ void DrawGrid (NPnodePtr node, void* dataRef)
 
 	//do not want scaling of root grid to effect children, single case
 	if (node == data->map.node[kNPnodeRootGrid])
+	{
 		glPopMatrix();				//restore for root grid only
+		return;				//current compromise is to draw root befoer pins, zz debug
+	}
 
 	//recursively traverse and draw children
 	for (i=0; i < node->childCount; i++)
@@ -803,6 +1113,10 @@ void npDrawConsole (void* dataRef)
 	if (!console->mode)		//update to use the hide 
 		return;
 
+	//zz debug, does not allow mouse picking the console, update for text entry
+	if (data->io.gl.pickPass)
+		return;
+
 	glColor4ub(console->boxColor.r, console->boxColor.g, console->boxColor.b, console->boxColor.a);
 
 	glBegin (GL_QUADS);
@@ -819,33 +1133,33 @@ void npDrawConsole (void* dataRef)
 		case kNPconsoleModeOne :
 			//offset to create text margin inside the box
 			glRasterPos2f (console->screen.x + 4.0f, console->screen.y + 7.0f);
-			glutBitmapString (GLUT_BITMAP_9_BY_15, &console->line[console->lineIndex][0]);
+			npGlutDrawString (GLUT_BITMAP_9_BY_15, &console->line[console->lineIndex][0]);
 			break;
 		case kNPconsoleModeThree :
 			glRasterPos2f (console->screen.x + 4.0f, console->screen.y + 7.0f);
-			glutBitmapString (GLUT_BITMAP_9_BY_15, &console->line[console->lineIndex][0]);
+			npGlutDrawString (GLUT_BITMAP_9_BY_15, &console->line[console->lineIndex][0]);
 	
 			//now print previous two lines above current line, handles buffer roll-over
 			if (console->lineIndex > 1)
 			{
 				glRasterPos2f (console->screen.x + 4.0f, console->screen.y + 7.0f + 15.0f);
-				glutBitmapString (GLUT_BITMAP_9_BY_15, &console->line[console->lineIndex - 1][0]);
+				npGlutDrawString (GLUT_BITMAP_9_BY_15, &console->line[console->lineIndex - 1][0]);
 				glRasterPos2f (console->screen.x + 4.0f, console->screen.y + 7.0f + 30.0f);
-				glutBitmapString (GLUT_BITMAP_9_BY_15, &console->line[console->lineIndex - 2][0]);
+				npGlutDrawString (GLUT_BITMAP_9_BY_15, &console->line[console->lineIndex - 2][0]);
 			}
 			else if (console->lineIndex > 0)
 			{
 				glRasterPos2f (console->screen.x + 4.0f, console->screen.y + 7.0f + 15.0f);
-				glutBitmapString (GLUT_BITMAP_9_BY_15, &console->line[0][0]);
+				npGlutDrawString (GLUT_BITMAP_9_BY_15, &console->line[0][0]);
 				glRasterPos2f (console->screen.x + 4.0f, console->screen.y + 7.0f + 30.0f);
-				glutBitmapString (GLUT_BITMAP_9_BY_15, &console->line[kNPconsoleLineMax - 1][0]);
+				npGlutDrawString (GLUT_BITMAP_9_BY_15, &console->line[kNPconsoleLineMax - 1][0]);
 			}
 			else	//index == 0
 			{
 				glRasterPos2f (console->screen.x + 4.0f, console->screen.y + 7.0f + 15.0f);
-				glutBitmapString (GLUT_BITMAP_9_BY_15, &console->line[kNPconsoleLineMax - 1][0]);
+				npGlutDrawString (GLUT_BITMAP_9_BY_15, &console->line[kNPconsoleLineMax - 1][0]);
 				glRasterPos2f (console->screen.x + 4.0f, console->screen.y + 7.0f + 30.0f);
-				glutBitmapString (GLUT_BITMAP_9_BY_15, &console->line[kNPconsoleLineMax - 2][0]);
+				npGlutDrawString (GLUT_BITMAP_9_BY_15, &console->line[kNPconsoleLineMax - 2][0]);
 			}
 			break;
 		case kNPconsoleModeMax :
@@ -855,7 +1169,7 @@ void npDrawConsole (void* dataRef)
 				str = &console->line[index--][0];
 				glRasterPos2f (console->screen.x + 4.0f, 
 								console->screen.y + 7.0f + 15.0f * (float)i);
-				glutBitmapString (GLUT_BITMAP_9_BY_15, str);
+				npGlutDrawString (GLUT_BITMAP_9_BY_15, str);
 
 				if (index < 0)
 					index = kNPconsoleLineMax - 1;	//handles buffer roll-over
@@ -872,6 +1186,10 @@ void npDrawFPS (void* dataRef)
 
 	pData data = (pData) dataRef;
 	pNPtextTag tag = &data->io.gl.hud.fps;
+
+	//zz debug, does not allow mouse picking the FPS, update to allow hiding
+	if (data->io.gl.pickPass)
+		return;
 
 	if (data->io.cycleDelta)
 		fps = (float) (1.0 / data->io.cycleDelta);
@@ -892,122 +1210,322 @@ void npDrawFPS (void* dataRef)
 //------------------------------------------------------------------------------
 void npDrawCompass (void* dataRef)
 {
-	static const NPubyteRGBA grey = {255,255,255,64};		//grey
-	static const NPubyteRGBA green = {0,70,0,150};			//green
-	static const NPubyteRGBA red = {255,0,0,180};			//red
-	static const NPubyteRGBA yellow = {255,255,0,220};		//yellow
 	pData data = (pData) dataRef;
-	NPnodePtr node = data->map.currentNode;
+	pNPnode hudParent = data->map.node[kNPnodeRootHUD];
+	pNPnode hudItem = NULL;
+	pNPnode node = data->map.currentNode;
+	pNPnode parent = node->parent;
 
-	//pNPtextTag tag = &data->io.gl.hud.fps;
-	NPtextTag heading;	//heading rotate.y
-	NPtextTag tilt;		//tile rotate.x
-	//NPtextTag roll;		//roll rotate.z
-	NPtextTag tagX;	//latitude
-	NPtextTag tagY;	//longitude
-	NPtextTag tagZ;	//altitude
-	NPtextTag mouseMode;
-	NPtextTag toolMode;
+	int i = 0;
+	int parentTopo = 0;
+	NPboolXYZ axes = data->io.axes;	//for convienance
+	static const NPubyteRGBA black = {0,0,0,85};
+	static const NPubyteRGBA grey = {127,127,127,127};
+	static const NPubyteRGBA green = {0,100,0,127};
+	static const NPubyteRGBA red = {255,0,0,200};
+	static const NPubyteRGBA yellow = {255,255,0,220};
 
-	npInitTextTag (&heading, dataRef);
-	npInitTextTag (&tilt, dataRef);
-	//npInitTextTag (&roll, dataRef);
-	npInitTextTag (&tagX, dataRef);
-	npInitTextTag (&tagY, dataRef);
-	npInitTextTag (&tagZ, dataRef);
-	npInitTextTag (&mouseMode, dataRef);
-	npInitTextTag (&toolMode, dataRef);
 
-	sprintf (heading.title,	"Heading: %6.2f", node->rotate.y);
-	sprintf (tilt.title,	"Tilt:    %6.2f", node->rotate.x);
-	//sprintf (roll.title,	"Roll:   %6.2f", node->rotate.z);
-//	sprintf (coordX.title,	"LONG X:%7.2f", node->translate.x);	//zz add display mode
-//	sprintf (coordY.title,	"LAT  Y:%7.2f", node->translate.y);
-//	sprintf (coordZ.title,	"ALT  Z:%7.2f", node->translate.z);
+	if (parent != NULL)
+		parentTopo = parent->topo;
 
-	if ( node->scaleRate.x || node->scaleRate.y || node->scaleRate.z 
-		|| (node->branchLevel && data->io.mouse.buttonR 
-			&& data->io.mouse.pickMode == kNPpickModePin))
+	//pNPtextTag tag = &data->io.gl.hud.fps;								//zz debug
+
+	//draw with Heading for tile or as compass directions
+	hudItem = hudParent->child[kNPhudCompass];
+	if (hudItem->childIndex)
+		sprintf (hudItem->tag->title, "Heading: %6.2f", node->rotate.y);
+	else
 	{
-		sprintf (tagX.title,	"Scale X:%7.2f", node->scale.x);
-		sprintf (tagY.title,	"Scale Y:%7.2f", node->scale.y);
-		sprintf (tagZ.title,	"Scale Z:%7.2f", node->scale.z);
+		if (node->rotate.y > 337.5f || node->rotate.y < 22.5f)
+			sprintf (hudItem->tag->title, "   %6.2f N    ", node->rotate.y);
+		else if (node->rotate.y > 292.5f) 
+			sprintf (hudItem->tag->title, "   %6.2f NW   ", node->rotate.y);
+		else if (node->rotate.y > 247.5f) 
+			sprintf (hudItem->tag->title, "   %6.2f W    ", node->rotate.y);
+		else if (node->rotate.y > 202.5f) 
+			sprintf (hudItem->tag->title, "   %6.2f SW   ", node->rotate.y);
+		else if (node->rotate.y > 157.5f) 
+			sprintf (hudItem->tag->title, "   %6.2f S    ", node->rotate.y);
+		else if (node->rotate.y > 112.5f) 
+			sprintf (hudItem->tag->title, "   %6.2f SE   ", node->rotate.y);
+		else if (node->rotate.y > 67.5f) 
+			sprintf (hudItem->tag->title, "   %6.2f E    ", node->rotate.y);
+		else if (node->rotate.y > 22.5f) 
+			sprintf (hudItem->tag->title, "   %6.2f NE   ", node->rotate.y);
+	}	
+	npUpdateTextTag (hudItem->tag, dataRef);
+
+
+	if ( node->scaleRate.x || node->scaleRate.y || node->scaleRate.z
+		|| data->io.mouse.tool == kNPtoolSize 
+		&& data->map.currentNode != data->map.currentCam
+		|| ( node->branchLevel && data->io.mouse.buttonR //does not handle if root is a torus, no ratio displayed, zz debug
+			 && data->io.mouse.pickMode == kNPmodePin
+			 && ( data->io.mouse.tool == kNPtoolCombo 
+				 || data->io.mouse.tool == kNPtoolCreate  ) ) )
+	{
+		hudItem = hudParent->child[kNPhudAngle];
+		sprintf (hudItem->tag->title, "Ratio:  %7.2f", node->ratio);
+		npUpdateTextTag (hudItem->tag, dataRef);
+		if (data->io.mouse.buttonR)
+			hudItem->tag->boxColor = green;			//green if active
+		else
+			hudItem->tag->boxColor = grey;			//grey if unavailable
+
+		hudItem = hudParent->child[kNPhudCoordX];
+		sprintf (hudItem->tag->title, "Scale X:%7.2f", node->scale.x);
+		npUpdateTextTag (hudItem->tag, dataRef);
+		if (axes.x)
+		{
+			if (data->io.mouse.buttonR)
+				hudItem->tag->boxColor = grey;
+			else
+				hudItem->tag->boxColor = green;
+		}
+		else
+			hudItem->tag->boxColor = black;
+
+		hudItem = hudParent->child[kNPhudCoordY];
+		sprintf (hudItem->tag->title, "Scale Y:%7.2f", node->scale.y);
+		npUpdateTextTag (hudItem->tag, dataRef);
+		if (axes.y)
+		{
+			if (data->io.mouse.buttonR)
+				hudItem->tag->boxColor = grey;
+			else
+				hudItem->tag->boxColor = green;
+		}
+		else
+			hudItem->tag->boxColor = black;
+
+		hudItem = hudParent->child[kNPhudCoordZ];
+		sprintf (hudItem->tag->title, "Scale Z:%7.2f", node->scale.z);
+		npUpdateTextTag (hudItem->tag, dataRef);
+		if (axes.z)
+		{
+			if (data->io.mouse.buttonR)
+				hudItem->tag->boxColor = grey;
+			else
+				hudItem->tag->boxColor = green;
+		}
+		else
+			hudItem->tag->boxColor = black;
+	}
+	else if ( data->io.mouse.tool == kNPtoolRotate
+			&& data->map.currentNode != data->map.currentCam ) 
+	{
+		hudItem = hudParent->child[kNPhudAngle];
+		if (hudItem->childIndex)					//clean this method up, zz debug
+			sprintf (hudItem->tag->title, "Roll:   %7.2f", node->rotate.z);
+		else
+			sprintf (hudItem->tag->title, "Tilt:   %7.2f", node->rotate.x);
+		hudItem->tag->boxColor = black;
+
+		hudItem = hudParent->child[kNPhudCoordX];
+		sprintf (hudItem->tag->title, "RotateX:%7.2f", node->rotate.x);
+		npUpdateTextTag (hudItem->tag, dataRef);
+		if (axes.x)
+		{	
+			if (data->io.mouse.buttonR)
+				hudItem->tag->boxColor = grey;
+			else
+				hudItem->tag->boxColor = green;
+		}
+		else
+			hudItem->tag->boxColor = black;
+
+		hudItem = hudParent->child[kNPhudCoordY];
+		sprintf (hudItem->tag->title, "RotateY:%7.2f", node->rotate.y);
+		npUpdateTextTag (hudItem->tag, dataRef);
+		if (axes.y)
+		{	
+			if (data->io.mouse.buttonR)
+				hudItem->tag->boxColor = grey;
+			else
+				hudItem->tag->boxColor = green;
+		}
+		else
+			hudItem->tag->boxColor = black;
+
+		hudItem = hudParent->child[kNPhudCoordZ];
+		sprintf (hudItem->tag->title, "RotateZ:%7.2f", node->rotate.z);
+		npUpdateTextTag (hudItem->tag, dataRef);
+		if (axes.z)
+		{	
+			if (data->io.mouse.buttonR || !(axes.x && axes.y))
+				hudItem->tag->boxColor = green;
+			else
+				hudItem->tag->boxColor = grey;
+		}
+		else
+		{	
+			if (data->io.mouse.buttonR)
+				hudItem->tag->boxColor = green;
+			else
+				hudItem->tag->boxColor = black;
+		}
+	}
+	else if (  (   data->io.mouse.tool == kNPtoolCombo
+				|| data->io.mouse.tool == kNPtoolCreate
+				|| data->io.mouse.tool == kNPtoolMove   )
+			 && data->map.currentNode != data->map.currentCam )
+	{
+		hudItem = hudParent->child[kNPhudAngle];
+		if (hudItem->childIndex)					//clean this method up, zz debug
+			sprintf (hudItem->tag->title, "Roll:   %7.2f", node->rotate.z);
+		else
+			sprintf (hudItem->tag->title, "Tilt:   %7.2f", node->rotate.x);
+		npUpdateTextTag (hudItem->tag, dataRef);
+		hudItem->tag->boxColor = black;
+
+		hudItem = hudParent->child[kNPhudCoordX];
+		sprintf (hudItem->tag->title, "Coord X:%7.2f", node->translate.x);
+		npUpdateTextTag (hudItem->tag, dataRef);
+		if (axes.x)
+			hudItem->tag->boxColor = green;
+		else
+		{
+			if (axes.x)
+				hudItem->tag->boxColor = grey;
+			else
+				hudItem->tag->boxColor = black;
+		}
+
+		hudItem = hudParent->child[kNPhudCoordY];
+		sprintf (hudItem->tag->title, "Coord Y:%7.2f", node->translate.y);
+		npUpdateTextTag (hudItem->tag, dataRef);
+		if (axes.y)
+		{
+			if ( !(axes.x && axes.y ))
+				hudItem->tag->boxColor = green;
+			else if (node->branchLevel == 0 && !axes.y)
+				hudItem->tag->boxColor = black;
+			else
+			{
+				if (parentTopo != kNPtopoPin && parentTopo != kNPtopoRod)
+					hudItem->tag->boxColor = green;
+				else
+					hudItem->tag->boxColor = grey;
+			}
+		}
+		else
+		{
+			if (data->io.axes.y)
+				hudItem->tag->boxColor = grey;
+			else
+				hudItem->tag->boxColor = black;
+		}
+
+		hudItem = hudParent->child[kNPhudCoordZ];
+		sprintf (hudItem->tag->title, "Coord Z:%7.2f", node->translate.z);
+		npUpdateTextTag (hudItem->tag, dataRef);
+		if (axes.z)
+		{
+			if ( !(axes.x && axes.y) )
+			{
+				if ( parentTopo != kNPtopoPin && parentTopo != kNPtopoRod
+					 && !(node->branchLevel == 0 && axes.y) )
+					hudItem->tag->boxColor = green;
+				else
+					hudItem->tag->boxColor = grey;
+			}
+			else
+				hudItem->tag->boxColor = grey;
+		}
+		else
+		{
+			if ( data->io.mouse.buttonR 
+				&& parentTopo != kNPtopoPin
+				&& parentTopo != kNPtopoRod
+				&& node->branchLevel != 0 )
+				hudItem->tag->boxColor = green;
+			else
+				hudItem->tag->boxColor = black;
+		}
 	}
 	else
 	{
-		sprintf (tagX.title,	"Coord X:%7.2f", node->translate.x);
-		sprintf (tagY.title,	"Coord Y:%7.2f", node->translate.y);
-		sprintf (tagZ.title,	"Coord Z:%7.2f", node->translate.z);
+		hudItem = hudParent->child[kNPhudAngle];
+		if (hudItem->childIndex)					//clean this method up, zz debug
+			sprintf (hudItem->tag->title, "Roll:   %7.2f", node->rotate.z);
+		else
+			sprintf (hudItem->tag->title, "Tilt:   %7.2f", node->rotate.x);
+		npUpdateTextTag (hudItem->tag, dataRef);
+		hudItem->tag->boxColor = black;
+
+		//	sprintf (coordX.title,	"LONG X:%7.2f", node->translate.x);	//zz debug, base on compass vs heading?
+		//	sprintf (coordY.title,	"LAT  Y:%7.2f", node->translate.y);
+		//	sprintf (coordZ.title,	"ALT  Z:%7.2f", node->translate.z);
+
+		hudItem = hudParent->child[kNPhudCoordX];
+		sprintf (hudItem->tag->title, "Coord X:%7.2f", node->translate.x);
+		npUpdateTextTag (hudItem->tag, dataRef);
+		if (data->io.axes.x)
+			hudItem->tag->boxColor = green;
+		else
+			hudItem->tag->boxColor = black;
+
+		hudItem = hudParent->child[kNPhudCoordY];
+		sprintf (hudItem->tag->title, "Coord Y:%7.2f", node->translate.y);
+		npUpdateTextTag (hudItem->tag, dataRef);
+		if (data->io.axes.y)
+			hudItem->tag->boxColor = green;
+		else
+			hudItem->tag->boxColor = black;
+
+		hudItem = hudParent->child[kNPhudCoordZ];
+		sprintf (hudItem->tag->title, "Coord Z:%7.2f", node->translate.z);
+		npUpdateTextTag (hudItem->tag, dataRef);
+		if (data->io.axes.z)
+			hudItem->tag->boxColor = green;
+		else
+			hudItem->tag->boxColor = black;
 	}
 
-	if (data->io.axes.x)
-		tagX.boxColor = green;
-	if (data->io.axes.y)
-		tagY.boxColor = green;
-	if (data->io.axes.z)
-		tagZ.boxColor = green;
 
-	if (data->io.mouse.pickMode == kNPpickModeCamera)
+	//update the mode outline color
+	hudItem = hudParent->child[kNPhudMode];
+	if (data->io.mouse.pickMode == kNPmodeCamera)
 	{
-		strcpy (mouseMode.title, "mode: Camera");
-		mouseMode.lineColor = red;
+		strcpy (hudItem->tag->title, "mode: Camera   "); //unify this with npPostMode, zz debug
+		hudItem->color = red;
 	}
-	else if (data->io.mouse.pickMode == kNPpickModeGrid)
+	else if (data->io.mouse.pickMode == kNPmodeGrid)
 	{
-		strcpy (mouseMode.title, "mode: Grid  ");
-		mouseMode.lineColor = yellow;
+		strcpy (hudItem->tag->title, "mode: Grid     ");
+		hudItem->color = yellow;
 	}
-	else if (data->io.mouse.pickMode == kNPpickModePin)
+	else // if (data->io.mouse.pickMode == kNPmodePin)
 	{
-		strcpy (mouseMode.title, "mode: Pin   ");
-		mouseMode.lineColor = grey;
+		strcpy (hudItem->tag->title, "mode: Pin      ");
+		hudItem->color = grey;
 	}
-	else //assume default mode
+	npUpdateTextTag (hudItem->tag, dataRef);
+
+	if (data->io.mouse.pickMode == kNPmodeCamera)
 	{
-		strcpy (mouseMode.title, "mode: Default");
-		mouseMode.lineColor = grey;
+		hudItem = hudParent->child[kNPhudTool];
+		strcpy (hudItem->tag->title, "tool: Pick     ");
+		npUpdateTextTag (hudItem->tag, dataRef);
 	}
 
-	if (data->io.mouse.tool == kNPtoolHide)
-		strcpy (toolMode.title, "tool: Hide  ");
-	if (data->io.mouse.tool == kNPtoolInfo)
-		strcpy (toolMode.title, "tool: Info  ");
-
-	//updates the box size, we really only need to do this once, debug zz
-	npUpdateTextTag (&heading, dataRef);
-	npUpdateTextTag (&tilt, dataRef);
-	//npUpdateTextTag (&roll, dataRef);
-	npUpdateTextTag (&tagX, dataRef);
-	npUpdateTextTag (&tagY, dataRef);
-	npUpdateTextTag (&tagZ, dataRef);
-
-	npUpdateTextTag (&mouseMode, dataRef);
-	npUpdateTextTag (&toolMode, dataRef);
-
-
+	//draw indicators
 	glPushMatrix();
-		glTranslatef (data->io.gl.width * -0.5f + 10.0f,
-					  data->io.gl.height * 0.5f - 25.0f, 0.0f);
-		//now draw the first tag
-			npDrawTextTag (&heading, data);
-		glTranslatef (0.0f, -21.0f, 0.0f);
-			npDrawTextTag (&tilt, data);
-	//	glTranslatef (0.0f, -21.0f, 0.0f);
-	//		npDrawTextTag (&roll, data);
-		glTranslatef (0.0f, -21.0f, 0.0f);
-			npDrawTextTag (&tagX, data);
-		glTranslatef (0.0f, -21.0f, 0.0f);
-			npDrawTextTag (&tagY, data);
-		glTranslatef (0.0f, -21.0f, 0.0f);
-			npDrawTextTag (&tagZ, data);
 
-		glTranslatef (0.0f, -24.0f, 0.0f);
-			npDrawTextTag (&mouseMode, data);
-		if (data->io.mouse.tool)
+		//update this to use hudRoot->tools position,						 zz degug
+		//set initial position to upper left corner
+		glTranslatef (data->io.gl.width * -0.5f + 5.0f,
+					  data->io.gl.height * 0.5f - 5.0f, 0.0f);
+
+		// for (i=0; i < hudParent->childCount; i++)						//zz debug
+		for (i = kNPhudCompass; i <= kNPhudTool; i++)
 		{
+			hudItem = hudParent->child[i];
 			glTranslatef (0.0f, -21.0f, 0.0f);
-			npDrawTextTag (&toolMode, data);
+			npDrawNodeTextTag (hudItem, data);
 		}
+
 	glPopMatrix();
 }
 
@@ -1021,38 +1539,37 @@ void npDrawHUD (void* dataRef)
 
 	glPushMatrix();
 	
-	glDisable(GL_DEPTH_TEST);
-	glDisable(GL_LIGHTING);
+	glDisable(GL_DEPTH_TEST);	//turn off depth testing so HUD is not obscured
+	glDisable(GL_LIGHTING);		//disable lighting to draw 100% ambient
 
-	glColor4f( 1.0f, 1.0f, 1.0f, 1.0f );
+	//enable subtractive transparency unless already done
+	if (data->io.gl.alphaMode != kNPalphaModeSubtractive)
+	{
+		glEnable (GL_BLEND);
+		glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	}
 
 	//scale to Screen Coords
 	sc = 63.067f / data->io.gl.height;	//63.067f for 35mm fov, upgrade for any fov, debug zz
 	glScalef( sc, sc, sc );
-	
 
-//	if(!data->io.gl.pickPass) //update to allow picking HUD elements, debug zz
-//		npDrawHUD (data);
-
+	//draws node text tags... //MB-LABEL
 	if (hud->drawTags)
-		npDrawNodeTags(data);				// draws overlays, grids, text... //MB-LABEL
+		npDrawNodeTags(data);
 
-	//these hud items NOT drawn during pickPass
-	if (!data->io.gl.pickPass)
+	//zz debug, currently drawConsole is redundant to kNPconsoleModeNull
+	if (hud->drawConsole)
 	{
-		if (hud->drawConsole)
+		npDrawConsole (data);
+
+		//sbow these hud elements based on console mode
+		if (hud->console.mode > kNPconsoleModeOne)
 		{
-			//sbow these hud elements based on console mode
-			if (hud->console.mode > kNPconsoleModeOne)
-			{
-				if (hud->drawFPS)
-					npDrawFPS (data);
+			if (hud->drawFPS)
+				npDrawFPS (data);
 
-				if (hud->drawCompass)
-					npDrawCompass (data);
-			}
-
-			npDrawConsole (data);
+			if (hud->drawCompass)
+				npDrawCompass (data);
 		}
 	}
 
@@ -1131,8 +1648,8 @@ float npDistance( NPfloatXYZ vecA, NPfloatXYZ vecB )
 //QSort Compare function
 int comparePinsDistanceFromCamera (const void* a, const void* b)
 {
-	NPnodePtr pinA = *(NPnodePtr*)a;
-	NPnodePtr pinB = *(NPnodePtr*)b;
+	pNPnode pinA = *(pNPnode*)a;
+	pNPnode pinB = *(pNPnode*)b;
 	
 	//optimized for the common case where neither a nor b is null
 	if( pinA == NULL || pinB == NULL )	//Null element in pinA & pinB: Nothing or Grid or Camera
@@ -1163,8 +1680,8 @@ void npDrawSort(void* dataRef)
 
 	pData data = (pData) dataRef;
 
-	NPnodePtr node = NULL;
-	NPnodePtr camNode = data->map.activeCam;
+	pNPnode node = NULL;
+	pNPnode camNode = data->map.currentCam;
 
 	int nodeRootCount = data->map.nodeRootCount;
 
@@ -1187,8 +1704,25 @@ void npDrawSort(void* dataRef)
 
 	//create z-sorted list, back to front
 	//QuickSort based on Distance From Camera, back to front z-sorted
-	qsort( data->map.sort, nodeRootCount, sizeof(NPnodePtr),
+	qsort( data->map.sort, nodeRootCount, sizeof(pNPnode),
 			comparePinsDistanceFromCamera );
+}
+
+//links with one end hidden are not drawn but need to be reset
+//------------------------------------------------------------------------------
+void npClearLinkQue (void* dataRef)
+{
+	pData data = (pData) dataRef;
+
+	int i = 0;
+
+	for (i=0; i < data->io.gl.linkQueCount; i++)
+	{
+		data->io.gl.linkQue[i]->linkFlag = 0;
+		data->io.gl.linkQue[i] = NULL;
+	}
+
+	data->io.gl.linkQueCount = 0;
 }
 
 //------------------------------------------------------------------------------
@@ -1197,7 +1731,7 @@ void npDrawNodes (void* dataRef)
 	int i = 0;
 	int selected = false;
 
-	NPnodePtr node = NULL;
+	pNPnode node = NULL;
 	pData data = (pData) dataRef;
 
 	int count = data->map.nodeRootCount;
@@ -1209,7 +1743,8 @@ void npDrawNodes (void* dataRef)
 	//alternately could draw the grid lines first, then the texture after pins
 	//this would cause pins to obscure grid lines
 	//another approach is to turn on clipping for grid lines and offset, debug zz
-//	DrawGrid (data->map.node[kNPnodeRootGrid], data);
+	//compromise by drawing root grid first, and sub-grids second
+	DrawGrid (data->map.node[kNPnodeRootGrid], data);
 
 	//draw all pin nodes, skip over camera and grids using kNPnodeRootPin
 	for( i = kNPnodeRootPin; i < count; i++ )
@@ -1217,29 +1752,36 @@ void npDrawNodes (void* dataRef)
 		//draw root nodes back to front using z-sorted list
 		node = data->map.sort[i];
 		
-		if (node == data->map.node[data->map.nodeRootIndex]) //use seletedIndex? debug zz
+		if (node == data->map.node[data->map.selectedPinIndex]) //use selectedRootIndex? debug zz
 			selected = true;
 		else
 			selected = false;
 
 		if (!node->hide)				//if not hidden draw node
 			switch (node->type)
-		{
-			case kNodeDefault	: DrawDefault(node); break;
-			case kNodeCamera	: DrawCamera (node); break;
-			case kNodeSurface	: DrawSurface(node); break;
-			case kNodePoints	: DrawPoints (node); break;
-			case kNodePin		: DrawPin (selected, node, data); break;
-			case kNodeVideo		: DrawVideo  (node); break;
-			case kNodeGrid		: DrawGrid   (node, data); break;
-		}
+			{
+				case kNodeDefault	: DrawDefault(node); break;
+				case kNodeCamera	: DrawCamera (node); break;
+				case kNodeSurface	: DrawSurface(node); break;
+				case kNodePoints	: DrawPoints (node); break;
+				case kNodePin		: DrawPin (selected, node, data); break;
+				case kNodeVideo		: DrawVideo  (node); break;
+				case kNodeGrid		: DrawGrid   (node, data); break;
+			}
+
+		npProcessLinkQue (data);
 	}
+
+	npClearLinkQue (data);
 
 	//draw grids last to allow objects behind transparent grids to be seen
 	//update this to allow a specified draw order using the node->shader
 	//for example, root grid should probably be drawn before nodes and
-	//sub-grids after nodes,											 debug zz
-	DrawGrid (data->map.node[kNPnodeRootGrid], data);
+	//sub-grids after nodes,												 debug zz
+	//compromise by drawing root grid first, and sub-grids second
+	node = data->map.node[kNPnodeRootGrid];
+	for (i=0; i < node->childCount; i++)
+		DrawGrid (node->child[i], data);
 }
 
 
@@ -1261,15 +1803,16 @@ NPfloatXYZ npProjectWorldToScreen (const pNPfloatXYZ offset)
 	//Model Matrix Current
 	glGetDoublev(GL_MODELVIEW_MATRIX, model_matrix);
 	
-	//Projection Matrix Current
+	//Projection Matrix Current					//optimize to get once per cycle, zz debug
 	glGetDoublev(GL_PROJECTION_MATRIX, projection_matrix);
 
-	//Viewport
+	//Viewport									//optimize to get once per cycle, zz debug
 	glGetIntegerv(GL_VIEWPORT, viewport);
 
 	//Do the projection
-	gluProject( offset->x, offset->y, offset->z, model_matrix, projection_matrix, 
-				viewport, &screenX, &screenY, &screenZ );
+	gluProject( offset->x, offset->y, offset->z,
+				model_matrix, projection_matrix, viewport,
+				&screenX, &screenY, &screenZ );
 
 	screen.x = (float)screenX;
 	screen.y = (float)screenY;

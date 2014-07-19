@@ -33,8 +33,8 @@
 //add the namespace, debug zz
 
 // #define NP_LINUX_
-#define NP_MSW_
-// #define NP_OSX_
+// #define NP_MSW_
+#define NP_OSX_
 
 #ifdef NP_MSW_
 #define _USE_MATH_DEFINES
@@ -45,8 +45,8 @@
 #include <string.h>
 #include <math.h>
 
-
 #include "data/nptypes.h"
+#include "data/npmath.h"
 #include "data/npnode.h"
 #include "data/npmap.h"
 
@@ -65,7 +65,7 @@ char* npGetDataTypeDesc (int type);
 
 void npDataPreset (int preset, void* dataRef);
 
-void npDataCameraPreset (int preset, NPnodePtr node, void* dataRef);
+void npDataCameraPreset (int preset, pNPnode node, void* dataRef);
 
 void npInitTextTag (pNPtextTag tag, void* dataRef);
 void npInitDataRecordTag (pNPrecordTag recordTag, void* dataRef);

@@ -61,27 +61,33 @@ void npInitGlut (int argc, char **argv, void* dataRef)
 	int depth = 0;
 	int result = 0;
 	int gMainWindow = 0;
+	char msg[256];
 
 	pData data = (pData) dataRef;
 
 	data->io.gl.fullScreen = true;			//S3D
-//	data->io.gl.stereo = false;				//S3D
 
 	glutInit (&argc, argv);
 
-	glGetBooleanv(GL_STEREO, &stereoSupport);
+#ifndef NP_OSX_	
+	sprintf (msg, "freeglut ver: %d", glutGet (GLUT_VERSION));			//zz-osx debug
+	npPostMsg (msg, kNPmsgCtrl, data);
+												//stereo not yet supported on OSX, zz debug
+	glGetBooleanv (GL_STEREO, &stereoSupport);
 	data->io.gl.stereo = stereoSupport;
+#endif
 
 	if (data->io.gl.stereo)
-		printf ("stereo 3D support: YES\n");
+		sprintf (msg, "Stereo 3D support: YES");
 	else
-		printf ("stereo 3D support: NO\n");
+		sprintf (msg, "Stereo 3D support: NO");
+	npPostMsg (msg, kNPmsgCtrl, data);
 
 	//stereo 3D pixel buffer
 	if (data->io.gl.stereo)
 		glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH | GLUT_STEREO);
 	else
-		glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
+		glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);			//add SRGBA support, zz
 
 	glutInitWindowPosition (kWindowPositionX, kWindowPositionY);
 	glutInitWindowSize (kWindowWidth, kWindowHeight);
@@ -119,7 +125,11 @@ void npInitGlut (int argc, char **argv, void* dataRef)
 	//register mouse events with GLUT
 	glutMouseFunc (npMouseEvent);
 	glutMotionFunc (npMouseMotion);
-
+	
+#ifndef NP_OSX_														//zz-osx debug
+	glutMouseWheelFunc (npMouseWheel);
+#endif
+	
 	glutDisplayFunc (npGlutDrawGLScene);
 	glutIdleFunc (npGlutDrawGLSceneIdle);
 
@@ -157,7 +167,7 @@ void npInitGlut (int argc, char **argv, void* dataRef)
 		}
 	}
 
-	npPostMsg ("ANTz hosted at: www.openANTz.com", kNPmsgCtrl, dataRef);
+	npPostMsg ("www.openANTz.com", kNPmsgCtrl, dataRef);
 	npPostMsg ("System Ready...", kNPmsgCtrl, dataRef);
 	//glGetIntegerv (GL_TEXTURE_STACK_DEPTH, &depth); // GL_MODELVIEW_STACK_DEPTH
 }
@@ -412,44 +422,44 @@ void npGlutPrimitive (int primitive)
 {
 	switch (primitive)
 	{
-	case kNPglutWireCube :
+	case kNPgeoCubeWire :
 		glScalef (0.6f, 0.6f, 0.6f); 
 		glutWireCube(2.0f);
 		glScalef (1.666667f, 1.666667f, 1.666667f);
 		break;
-	case kNPglutSolidCube :
+	case kNPgeoCube :
 		glScalef (0.6f, 0.6f, 0.6f);
 		glutSolidCube(2.0f);
 		glScalef (1.666667f, 1.666667f, 1.666667f);
 		break;
-	case kNPglutWireSphere : glutWireSphere( 1.0f, 24, 12); break;//15, 15 ); break;
-	case kNPglutSolidSphere : glutSolidSphere( 1.0f, 24, 12 ); break;
+	case kNPgeoSphereWire : glutWireSphere( 1.0f, 24, 12); break;//15, 15 ); break;
+	case kNPgeoSphere : glutSolidSphere( 1.0f, 24, 12 ); break;
 
-	case kNPglutWireCone : glutWireCone( 1.0f, 2.0f, 24, 1 ); break;
-	case kNPglutSolidCone : glutSolidCone( 1.0f, 2.0f, 24, 1 ); break;
+	case kNPgeoConeWire : glutWireCone( 1.0f, 2.0f, 24, 1 ); break;
+	case kNPgeoCone : glutSolidCone( 1.0f, 2.0f, 24, 1 ); break;
 
-	case kNPglutWireTorus : glutWireTorus(0.15f, 1.5f, 7, 16); break;
-	case kNPglutSolidTorus : glutSolidTorus(0.15f, 1.5f, 7, 16); break;
+	case kNPgeoTorusWire : glutWireTorus(kNPtorusRadius * 0.1f, kNPtorusRadius, 7, 16); break;
+	case kNPgeoTorus : glutSolidTorus(kNPtorusRadius * 0.1f, kNPtorusRadius, 7, 16); break;
 
-	case kNPglutWireDodecahedron :
+	case kNPgeoDodecahedronWire :
 		glScalef (0.6f, 0.6f, 0.6f);
 		glutWireDodecahedron();
 		glScalef (1.666667f, 1.666667f, 1.666667f);
 		break;
-	case kNPglutSolidDodecahedron :
+	case kNPgeoDodecahedron :
 		glScalef (0.6f, 0.6f, 0.6f);
 		glutSolidDodecahedron();
 		glScalef (1.666667f, 1.666667f, 1.666667f);
 		break;
-	case kNPglutWireOctahedron : glutWireOctahedron(); break;
-	case kNPglutSolidOctahedron : glutSolidOctahedron(); break;
-	case kNPglutWireTetrahedron : glutWireTetrahedron(); break;
-	case kNPglutSolidTetrahedron : glutSolidTetrahedron(); break;
-	case kNPglutWireIcosahedron : glutWireIcosahedron(); break;
-	case kNPglutSolidIcosahedron : glutSolidIcosahedron(); break;
+	case kNPgeoOctahedronWire : glutWireOctahedron(); break;
+	case kNPgeoOctahedron : glutSolidOctahedron(); break;
+	case kNPgeoTetrahedronWire : glutWireTetrahedron(); break;
+	case kNPgeoTetrahedron : glutSolidTetrahedron(); break;
+	case kNPgeoIcosahedronWire : glutWireIcosahedron(); break;
+	case kNPgeoIcosahedron : glutSolidIcosahedron(); break;
 
-	case kNPglutWireTeapot : glutWireTeapot( 2.0f ); break;
-	case kNPglutSolidTeapot : glutSolidTeapot( 2.0f ); break;
+//	case kNPglutWireTeapot : glutWireTeapot( 2.0f ); break;
+//	case kNPglutSolidTeapot : glutSolidTeapot( 2.0f ); break;
 
 	default : glutWireTetrahedron(); break;
 	}

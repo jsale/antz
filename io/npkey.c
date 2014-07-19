@@ -69,11 +69,13 @@ void npInitKey (void* dataRef)
 	key->map[kKeyDown][kKeyCodeM]				= kNPcmdMenu;
 
 	key->map[kKeyDown][kKeyCodeY]				= kNPcmdSegments;
-	key->map[kKeyDown][kKeyCodeT]				= kNPcmdTexture;
+	key->map[kKeyDown][kKeyCodeV]				= kNPcmdTexture;
 
 	key->map[kKeyDown][kKeyCodeESC]				= kNPcmdFullscreen;
 //	key->map[kKeyDown][kKeyCodeB]				= kNPcmdClearFrameBuffer;
 	key->map[kKeyDown][kKeyCodeB]				= kNPcmdBackground;
+
+	key->map[kKeyDown][kKeyCodeT]				= kNPcmdTool;
 	key->map[kKeyDown][kKeyCodeX]				= kNPcmdSelectAxes;
 
 	key->map[kKeyDown][kKeyCodeC]				= kNPcmdCamera;
@@ -96,10 +98,10 @@ void npInitKey (void* dataRef)
 	key->map[kKeyDown][kKeyCodeF]				= kNPcmdFreeze;
 	key->map[kKeyDown][kKeyCodeH]				= kNPcmdHide;
 
-	key->map[kKeyDown][kKeyCodeO]				= kNPcmdPrimitive;
+	key->map[kKeyDown][kKeyCodeO]				= kNPcmdGeometry;
 	key->map[kKeyDown][kKeyCodeJ]				= kNPcmdTopo;
 
-	key->map[kKeyDown][kKeyCodeI]				= kNPcmdTagType;
+	key->map[kKeyDown][kKeyCodeI]				= kNPcmdTagMode;
 	
 	key->map[kKeyDown][kKeyCodeK]				= kNPfileSave;
 	key->map[kKeyDown][kKeyCodeL]				= kNPfileOpen;

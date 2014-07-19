@@ -29,19 +29,19 @@
 #include "../npio.h"
 #include "../io/npmouse.h"
 
-void UpdateNode (NPnodePtr node, pData dataRef);
-void UpdateNodeChild (NPnodePtr node, pData dataRef);
+void UpdateNode (pNPnode node, pData dataRef);
+void UpdateNodeChild (pNPnode node, pData dataRef);
 
-void UpdateNodeDefault (NPnodePtr node, pData dataRef);
-void UpdateNodeCamera (NPnodePtr node, pData dataRef);
-void UpdateNodeSurface (NPnodePtr node, pData dataRef);
-void UpdateNodePoints (NPnodePtr node, pData dataRef);
-void UpdateNodePin (NPnodePtr node, pData dataRef);
-void UpdateNodeVideo (NPnodePtr node, pData dataRef);
-void UpdateNodeGrid (NPnodePtr node, pData dataRef);
-void UpdateNodeData (NPnodePtr node, pData dataRef);
+void UpdateNodeDefault (pNPnode node, pData dataRef);
+void UpdateNodeCamera (pNPnode node, pData dataRef);
+void UpdateNodeSurface (pNPnode node, pData dataRef);
+void UpdateNodePoints (pNPnode node, pData dataRef);
+void UpdateNodePin (pNPnode node, pData dataRef);
+void UpdateNodeVideo (pNPnode node, pData dataRef);
+void UpdateNodeGrid (pNPnode node, pData dataRef);
+void UpdateNodeData (pNPnode node, pData dataRef);
 
-void UpdateNodeWithMouse( NPnodePtr node, pData dataRef);	//zz-CAMERA
+void UpdateNodeWithMouse( pNPnode node, pData dataRef);	//zz-CAMERA
 
 //------------------------------------------------------------------------------
 void npInitEngine (void* dataRef)
@@ -65,7 +65,7 @@ void npUpdateEngine (void* dataRef)
 
 	pData data = (pData) dataRef;
 
-	NPnodePtr node = NULL;
+	pNPnode node = NULL;
 
 
 	//start at 1 and skip the kNPnodeRootNull, temp workaround				debug zz
@@ -83,9 +83,13 @@ void npUpdateEngine (void* dataRef)
 
 // recursively calls this function to traverse entire tree
 //------------------------------------------------------------------------------
-void UpdateNodeChild (NPnodePtr node, pData dataRef)
+void UpdateNodeChild (pNPnode node, pData dataRef)
 {
 	int i = 0;
+
+						//crashes without this when link created, not sure why, zz debug
+	if (node->type == kNodeLink)
+		return;
 
 	for (i=0; i < node->childCount; i++)
 	{
@@ -100,7 +104,7 @@ void UpdateNodeChild (NPnodePtr node, pData dataRef)
 
 //------------------------------------------------------------------------------
 //zz-JJ this is being replaced by your ptr to ptr method
-void UpdateNodeData (NPnodePtr node, pData dataRef)
+void UpdateNodeData (pNPnode node, pData dataRef)
 {
 	float colorShift = 0;
 	float scale = 0;
@@ -141,38 +145,39 @@ void UpdateNodeData (NPnodePtr node, pData dataRef)
 
 
 //------------------------------------------------------------------------------
-void UpdateNode (NPnodePtr node, pData dataRef)
+void UpdateNode (pNPnode node, pData dataRef)
 {
-	if (node->freeze)			//do not update if frozen
+	if (node->freeze)		//do not update if frozen
 		return;
 
-	switch (node->type)
+	switch (node->type)		//types organized to optimize switch statement speed
 	{
-		case kNodeDefault : UpdateNodeDefault (node, dataRef); break;
-		case kNodeCamera : UpdateNodeCamera (node, dataRef); break;
-		case kNodeSurface : UpdateNodeSurface (node, dataRef); break;
-		case kNodePoints : UpdateNodePoints (node, dataRef); break;
-		case kNodePin : UpdateNodePin (node, dataRef); break;
-		case kNodeVideo : UpdateNodeVideo (node, dataRef); break;
-		case kNodeGrid : UpdateNodeGrid (node, dataRef); break;
+		case kNodePin :		UpdateNodePin (node, dataRef); break;
+		case kNodeLink :	UpdateNodeDefault (node, dataRef); break;
+		case kNodeDefault :	UpdateNodeDefault (node, dataRef); break;
+		case kNodeCamera :	UpdateNodeCamera (node, dataRef); break;
+		case kNodeVideo :	UpdateNodeVideo (node, dataRef); break;
+		case kNodeSurface :	UpdateNodeSurface (node, dataRef); break;
+		case kNodePoints :	UpdateNodePoints (node, dataRef); break;
+		case kNodeGrid :	UpdateNodeGrid (node, dataRef); break;
+		case kNodeHUD : break;
+		default : npPostMsg("err 2559 - unknown node type", kNPmsgErr, dataRef);
 	}
 }
 
 
 //------------------------------------------------------------------------------
-void UpdateNodeDefault (NPnodePtr node, pData dataRef)
+void UpdateNodeDefault (pNPnode node, pData dataRef)
 {
 	float i = 0.0f;
 
-	NPnodePtr parent = node->parent;
+	pNPnode parent = node->parent;
 	pData data = (pData) dataRef;
 
+
 	// if selected update node with mouse movement
-	if ( ( node->selected || node == data->map.currentNode ) 
-		&& data->map.nodeRootIndex >= kNPnodeRootPin )		//update for grid, debug zz
-	{
+	if (node->selected || node == data->map.currentNode)
 		UpdateNodeWithMouse (node, dataRef);
-	}
 
 	//update translation
 	node->translate.x += node->translateRate.x;
@@ -279,8 +284,21 @@ void UpdateNodeDefault (NPnodePtr node, pData dataRef)
 				printf ("id: %d   facet: %d\n", node->id, node->facet);
 			}
 		}
-		else if (node->topo == kNPtopoSphere || node->topo == 0 
-				|| node->topo == kNPtopoTorus || parent->topo == kNPtopoPin)
+		else if (parent->topo == kNPtopoCylinder)
+		{
+			if (node->translate.x > 180.0f)
+				node->translate.x += -360.0f;
+			if (node->translate.x < -180.0f)
+				node->translate.x += 360.0f;
+			if (node->translate.y > 90.0f)
+				node->translate.y += -180.0f;
+			if (node->translate.y < -90.0f)
+				node->translate.y += 180.0f;
+		}
+		else if (node->topo == kNPtopoSphere
+				|| node->topo == kNPtopoTorus
+				|| parent->topo == kNPtopoPin
+				|| parent->topo == kNPtopoRod )
 		{
 			if (node->translate.x > 180.0f)
 				node->translate.x += -360.0f;
@@ -300,16 +318,16 @@ void UpdateNodeDefault (NPnodePtr node, pData dataRef)
 void npCameraTranslate (void* nodeRef, void* dataRef )
 {
 	pData data = (pData) dataRef;
-	NPnodePtr cam = (NPnodePtr) nodeRef;
-	NPnodePtr targetNode = data->map.node[data->map.selectedPinIndex];
-	NPnodePtr rootGrid = data->map.node[kNPnodeRootGrid];
+	pNPnode cam = (pNPnode) nodeRef;
+	pNPnode targetNode = data->map.selectedPinNode; //node[data->map.selectedPinIndex];
+	pNPnode rootGrid = data->map.node[kNPnodeRootGrid];
 
 	float radius = 0.0f;
 	float cdX = 0.0f, cdY = 0.0f, cdZ = 0.0f;
 	float tX = 0.0f, tY = 0.0f, tZ = 0.0f;
 	float dX = 0.0f, dY = 0.0f, dZ = 0.0f;
 
-	if (data->io.mouse.pickMode == kNPpickModeGrid)									//zz debug
+	if (data->io.mouse.pickMode == kNPmodeGrid)									//zz debug
 		targetNode = data->map.selectedGrid;
 
 	//global position of entire scene is relative to the root grid scale.z
@@ -319,7 +337,11 @@ void npCameraTranslate (void* nodeRef, void* dataRef )
 		data->io.mouse.targetDest.x = targetNode->translate.x;
 		data->io.mouse.targetDest.y = targetNode->translate.y;
 		data->io.mouse.targetDest.z = targetNode->translate.z * rootGrid->scale.z
-									+ kNPpinHeight * targetNode->scale.z;
+									+ kNPoffsetPin * targetNode->scale.z;
+
+		data->io.mouse.targetDest.x = targetNode->world.x;
+		data->io.mouse.targetDest.y = targetNode->world.y;
+		data->io.mouse.targetDest.z = targetNode->world.z;
 	}
 	
 	if (data->io.mouse.mode == kNPmouseModeCamExamXZ)
@@ -365,12 +387,12 @@ void npCameraTranslate (void* nodeRef, void* dataRef )
 
 
 //------------------------------------------------------------------------------
-void npUpdateCameraMouse (void* nodeRef, void* dataRef )
+void UpdateCameraMouse (void* nodeRef, void* dataRef )
 {
 	float sinY = 0.0f, cosY = 0.0f;
 
 	pData data = (pData) dataRef;
-	NPnodePtr node = (NPnodePtr) nodeRef;
+	pNPnode node = (pNPnode) nodeRef;
 	pNPmouse mouse = (pNPmouse) &data->io.mouse;
 
 	switch (data->io.mouse.mode)
@@ -420,7 +442,7 @@ void npUpdateCameraMouse (void* nodeRef, void* dataRef )
 // z may be fixed or not, defaults to horizon vs flightsim roll
 // translateRate x pans left & right, y for up & down, and z for forward & back
 //------------------------------------------------------------------------------
-void UpdateNodeCamera (NPnodePtr node, pData dataRef)
+void UpdateNodeCamera (pNPnode node, pData dataRef)
 {
 	float sinX = 0.0f, cosX = 0.0f;
 	float sinY = 0.0f, cosY = 0.0f;
@@ -430,9 +452,9 @@ void UpdateNodeCamera (NPnodePtr node, pData dataRef)
 
 	// update active camera with mouse movement
 	if (data->map.currentNode == node)
-		npUpdateCameraMouse (node, data);			//zz-CAMERA
+		UpdateCameraMouse (node, data);			//zz-CAMERA
 
-	if (node == data->map.activeCam && node->proximity.x != 0.0f	//do we need to check radius, debug, zz
+	if (node == data->map.currentCam && node->proximity.x != 0.0f	//do we need to check radius, debug, zz
 		&& data->io.mouse.mode != kNPmouseModeCamFlyA)
 		npCameraTranslate(node,data);
 
@@ -456,22 +478,22 @@ void UpdateNodeCamera (NPnodePtr node, pData dataRef)
 		node->rotate.z += 360.0f;
 /*
 		node->rotate.x += node->rotateRate.x;
-	if (node->rotate.x >= kPos2PI / 4.0f)	// limit to +/- 90 deg
-		node->rotate.x = kPos2PI / 4.0f;
+	if (node->rotate.x >= k2PI / 4.0f)	// limit to +/- 90 deg
+		node->rotate.x = k2PI / 4.0f;
 	if (node->rotate.x <= kNeg2PI / 4.0f)
-		node->rotate.x = -kPos2PI / 4.0f;
+		node->rotate.x = -k2PI / 4.0f;
 
 	node->rotate.y += node->rotateRate.y;
-	if (node->rotate.y >= kPos2PI)
-		node->rotate.y -= kPos2PI;
+	if (node->rotate.y >= k2PI)
+		node->rotate.y -= k2PI;
 	if (node->rotate.y <= kNeg2PI)
-		node->rotate.y += kPos2PI;
+		node->rotate.y += k2PI;
 
 	node->rotate.z += node->rotateRate.z;
-	if (node->rotate.z >= kPos2PI)
-		node->rotate.z -= kPos2PI;
+	if (node->rotate.z >= k2PI)
+		node->rotate.z -= k2PI;
 	if (node->rotate.z < 0.0f)
-		node->rotate.z += kPos2PI;
+		node->rotate.z += k2PI;
 */
 	//calculate the rotation vector				// optimize with lookup tables, zz
 	sinX = sinf( (-node->rotate.x + 90.0f) / kRADtoDEG);
@@ -502,11 +524,25 @@ void UpdateNodeCamera (NPnodePtr node, pData dataRef)
 	//z ignores the angles just move in global coordinates, 0.5 to reduce speed
 	node->translateVec.z = node->translateRate.z * 0.5f;
 
-	//update the position by adding the vector to existing position
-	node->translate.x += node->translateVec.x;
-	node->translate.y += node->translateVec.y;
-	node->translate.z += node->translateVec.z;
 
+	if ( node == data->map.currentCam && node->proximity.x != 0.0f )
+//		 && ( data->io.mouse.mode == kNPmouseModeCamExamXY
+//			  || data->io.mouse.mode == kNPmouseModeCamExamXY ) )
+	{
+		//make sure we don't get to close and locked into 0 distance
+		if ( node->translateRate.z > 0.0f 
+			|| node->proximity.x > -node->translateRate.z)
+			node->proximity.x *= 1.0f + node->translateRate.z * 0.2f;
+		node->rotate.x += node->translateRate.y * -4.0f;	//axes swap
+		node->rotate.y += node->translateRate.x * -5.0f;	//and inversion
+	}
+	else
+	{
+		//update the position by adding the vector to existing position
+		node->translate.x += node->translateVec.x;
+		node->translate.y += node->translateVec.y;
+		node->translate.z += node->translateVec.z;
+	}
 
 	//limit from going below the surface
 	if (node->triggerLo.z)
@@ -521,21 +557,21 @@ void UpdateNodeCamera (NPnodePtr node, pData dataRef)
 
 
 //------------------------------------------------------------------------------
-void UpdateNodeSurface (NPnodePtr node, pData dataRef)
+void UpdateNodeSurface (pNPnode node, pData dataRef)
 {
 	UpdateNodeDefault (node, dataRef);
 }
 
 
 //------------------------------------------------------------------------------
-void UpdateNodePoints (NPnodePtr node, pData dataRef)
+void UpdateNodePoints (pNPnode node, pData dataRef)
 {
 	UpdateNodeDefault (node, dataRef);
 }
 
 
 //------------------------------------------------------------------------------
-void UpdateNodePin (NPnodePtr node, pData dataRef)
+void UpdateNodePin (pNPnode node, pData dataRef)
 {
 	pData data = (pData) dataRef;
 
@@ -574,15 +610,15 @@ void UpdateNodePin (NPnodePtr node, pData dataRef)
 	node->rotate.x += node->rotateRate.x * 2.0f;	// * 2 to make faster then cam
 	node->rotate.y += node->rotateRate.y * 2.0f;
 
-	if (node->rotate.x >= kPos2PI)
-		node->rotate.x -= kPos2PI;
+	if (node->rotate.x >= k2PI)
+		node->rotate.x -= k2PI;
 	if (node->rotate.x <= kNeg2PI)
-		node->rotate.x += kPos2PI;
+		node->rotate.x += k2PI;
 
-	if (node->rotate.y >= kPos2PI)
-		node->rotate.y -= kPos2PI;
+	if (node->rotate.y >= k2PI)
+		node->rotate.y -= k2PI;
 	if (node->rotate.y <= kNeg2PI)
-		node->rotate.y += kPos2PI;
+		node->rotate.y += k2PI;
 
 	node->rotateVec.angle = node->rotate.x * kRADtoDEG;		//debug, zz
 
@@ -600,14 +636,14 @@ void UpdateNodePin (NPnodePtr node, pData dataRef)
 
 
 //------------------------------------------------------------------------------
-void UpdateNodeVideo (NPnodePtr node, pData dataRef)
+void UpdateNodeVideo (pNPnode node, pData dataRef)
 {
 	UpdateNodeDefault (node, dataRef);
 }
 
 
 //------------------------------------------------------------------------------
-void UpdateNodeGrid (NPnodePtr node, pData dataRef)
+void UpdateNodeGrid (pNPnode node, pData dataRef)
 {
 	pData data = (pData) dataRef;
 
@@ -627,20 +663,37 @@ void UpdateNodeGrid (NPnodePtr node, pData dataRef)
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
-void UpdateNodeWithMouse (NPnodePtr node, pData dataRef)
+void UpdateNodeWithMouse (pNPnode node, pData dataRef)
 {
 	float distFactor = 1.0f;
 	float dX = 0.0f, dY = 0.0f, dZ = 0.0f;
 	float sinY = 0.0f, cosY = 0.0f;
+	float deltaSum = 0.0f;
 
 	pData data = (pData) dataRef;
-	NPnodePtr cam = data->map.activeCam;	//get the current camera
-	NPnodePtr parent = node->parent;
+	pNPnode cam = data->map.currentCam;	//get the current camera
+	pNPnode parent = node->parent;
 
 	pNPmouse mouse = (pNPmouse) &data->io.mouse;
 
 	if (mouse->mode == kNPmouseModeNull)	//fixes mouse slip bug
 		return;
+
+	if (data->map.nodeRootIndex < kNPnodeRootPin)		//update for grid, debug zz
+		return;
+
+	//redundant with above statement, but grids being effected so....
+	if (node->type != kNodePin && node->type != kNodeLink)				//update to allow links and grid, debug zz
+		return;
+
+	if (   data->io.mouse.tool != kNPtoolCombo
+		&& data->io.mouse.tool != kNPtoolCreate
+		&& data->io.mouse.tool != kNPtoolMove
+		&& data->io.mouse.tool != kNPtoolRotate
+		&& data->io.mouse.tool != kNPtoolSize
+		)
+		return;
+
 
 	sinY = sinf(cam->rotate.y / kRADtoDEG);
 	cosY = cosf(cam->rotate.y / kRADtoDEG);
@@ -656,84 +709,144 @@ void UpdateNodeWithMouse (NPnodePtr node, pData dataRef)
 	
 	//data->io.mouse.mode
 	//parent->topo && node->branchLevel
-	if (node->branchLevel == 0)			//default
-	{
-		distFactor = cam->proximity.x * 0.1f; // movement scaled by distance to cam
 
-		// update the translateVec for selected objects
-		// optimize by calculating once (at camera?) and use for all nodes, debug, zz
-		node->translate.x += ( cosY * dX - sinY * dY ) * distFactor;			
-		node->translate.y += ( -sinY * dX - cosY * dY ) * distFactor;
-		node->translate.z += dZ * distFactor;
-	}
-	else
+	//Combo tool is also used by create during drag operations
+	if (data->io.mouse.tool == kNPtoolCombo || data->io.mouse.tool == kNPtoolCreate)
 	{
-		if (parent == NULL)
+		if (node->branchLevel == 0)			//default
 		{
-			printf ("err 2458 - id: %d parent node is NULL\n", node->id);
-			return;
-		}
-/*
-		switch (parent->topo)
-		{
-//			case kNPtopoNull : break;	//topo based on geometery type, default
-			case kNPtopoCube : break;
-			case kNPtopoSphere : break;
-			case kNPtopoTorus : break;
-			case kNPtopoSurface : break;
-			case kNPtopoPin : break;
-			case kNPtopoGrid : break;
-
-			default : 
-				distFactor = cam->proximity.x * 0.1f; // movement scaled by distance to cam
-				// update the translateVec for selected objects
-				// optimize by calculating once (at camera?) and use for all nodes, debug, zz
-				node->translate.x += ( cosY * dX - sinY * dY ) * distFactor;			
-				node->translate.y += ( -sinY * dX - cosY * dY ) * distFactor;
+			distFactor = cam->proximity.x * 0.1f; // movement scaled by distance to cam
+		
+			if (data->io.mouse.buttonR)
 				node->translate.z += dZ * distFactor;
-				break;			//topo based on geometery type, default
-		}
-	*/	
-		if (node->branchLevel >= 1)
-		{
-			distFactor = cam->proximity.x; // movement scaled by distance to cam
-
-			if (	parent->topo == kNPtopoPin 
-				|| (parent->topo == kNPtopoNull && parent->geometry == kNPprimitiveSolidPin) )
+			else 
 			{
-				//if Drag XY then slide vertically up down pin
-				if (data->io.mouse.mode == kNPmouseModeDragXY)
+				if (!(data->io.axes.x && data->io.axes.y))
 				{
-					node->translate.x -= dY * distFactor;	//invert mouse y
-					if (node->translate.x > 180.0f)			//limit top bottom
-						node->translate.x = 180.0f;
-					if (node->translate.x < -180.0f)
-						node->translate.x = -180.0f;
+					if (!data->io.axes.x && !data->io.axes.y && data->io.axes.z)
+						node->translate.z += (dX + -dY + dZ) * distFactor;
+					else if (!data->io.axes.x)		//YZ only moves Y, not Z
+						dX = 0.0f; //turn off X for the XY plane following this
+					else if (data->io.axes.x && data->io.axes.z) //XZ
+					{
+						node->translate.z += -dY * distFactor;
+						dY = 0.0f; //turn off X for the XY plane following this
+					}
 				}
-				else
-				{	if (data->io.axes.x)
-						node->scale.x += data->io.mouse.delta.y * -0.005f;		// invert the Y axes	
-					if (data->io.axes.y)
-						node->scale.y += data->io.mouse.delta.y * -0.005f;		// insert check for active axes, debug, zz
-					if (data->io.axes.z)
-						node->scale.z += data->io.mouse.delta.y * -0.005f;
 				
-					node->ratio += data->io.mouse.delta.x * 0.001f;
-					if (node->ratio < 0.01f)
-						node->ratio = 0.01f;
-					if (node->ratio > 1.0f)
-						node->ratio = 1.0f;
+				if (data->io.axes.x || data->io.axes.y)
+				{
+					if (!data->io.axes.y)
+						dY = 0.0f;
+					// update the translateVec for selected objects
+					// optimize by calculating once (at camera?) and use for all nodes, debug, zz
+					node->translate.x += ( cosY * dX - sinY * dY ) * distFactor;			
+					node->translate.y += ( -sinY * dX - cosY * dY ) * distFactor;
 				}
 			}
-			else	//not a pin
+		}
+		else
+		{
+			if (parent == NULL)
 			{
-				distFactor = 50.0f;		// fixed movement
-				if (data->io.mouse.mode == kNPmouseModeDragXY)
+				printf ("err 2458 - id: %d parent node is NULL\n", node->id);
+				return;
+			}
+	/*
+			switch (parent->topo)
+			{
+	//			case kNPtopoNull : break;	//topo based on geometery type, default
+				case kNPtopoCube : break;
+				case kNPtopoSphere : break;
+				case kNPtopoTorus : break;
+				case kNPtopoSurface : break;
+				case kNPtopoPin : break;
+				case kNPtopoGrid : break;
+
+				default : 
+					distFactor = cam->proximity.x * 0.1f; // movement scaled by distance to cam
+					// update the translateVec for selected objects
+					// optimize by calculating once (at camera?) and use for all nodes, debug, zz
+					node->translate.x += ( cosY * dX - sinY * dY ) * distFactor;			
+					node->translate.y += ( -sinY * dX - cosY * dY ) * distFactor;
+					node->translate.z += dZ * distFactor;
+					break;			//topo based on geometery type, default
+			}
+		*/																	   //zz debug
+			if (node->branchLevel >= 1)	//perhaps set root pins at branchLevel == 1 
+										//and have parent topo be a grid and treat all nodes the same
+			{
+				distFactor = cam->proximity.x; // movement scaled by distance to cam
+
+				if ( parent->topo == kNPtopoPin 
+					|| parent->topo == kNPtopoRod
+					|| (parent->topo == kNPtopoNull && parent->geometry == kNPgeoPin)
+					|| node->type == kNodeLink )	//zz debug, perhaps should check for branchLevel == 0
 				{
-					node->translate.x += dX * distFactor;			
-					node->translate.y += -dY * distFactor;
+					//if Drag XY then slide vertically up down pin
+					if (data->io.mouse.mode == kNPmouseModeDragXY)
+					{
+						node->translate.x -= dY * distFactor;	//invert mouse y
+						if (node->translate.x > 180.0f)			//limit top bottom
+							node->translate.x = 180.0f;
+						if (node->translate.x < -180.0f)
+							node->translate.x = -180.0f;
+					}
+					else
+					{
+						if (data->io.axes.x)
+							node->scale.x += data->io.mouse.delta.y * -0.005f;		// invert the Y axes	
+						if (data->io.axes.y)
+							node->scale.y += data->io.mouse.delta.y * -0.005f;		// insert check for active axes, debug, zz
+						if (data->io.axes.z)
+							node->scale.z += data->io.mouse.delta.y * -0.005f;
+					
+						node->ratio += data->io.mouse.delta.x * 0.001f;
+						if (node->ratio < 0.01f)
+							node->ratio = 0.01f;
+						if (node->ratio > 1.0f)
+							node->ratio = 1.0f;
+					}
 				}
-				else
+				else	//not a pin
+				{
+					distFactor = 50.0f;		// fixed movement
+					if (data->io.mouse.mode == kNPmouseModeDragXY)
+					{
+						distFactor = 35.0f;
+						if (data->io.axes.x)
+							node->translate.x += dX * distFactor;
+						else if (data->io.axes.y && data->io.axes.z) //YZ
+							node->translate.z += dX * distFactor;
+
+						if (data->io.axes.y)
+							node->translate.y += -dY * distFactor;
+						else if (data->io.axes.x && data->io.axes.z) //XZ
+							node->translate.z += -dY * distFactor;
+
+						if (!data->io.axes.x && !data->io.axes.y && data->io.axes.z) //Z
+							node->translate.z += (dX + -dY + dZ) * distFactor;	
+					}
+					else
+					{
+						node->ratio += data->io.mouse.delta.x * 0.001f;
+						if (node->ratio < 0.01f)
+							node->ratio = 0.01f;
+						if (node->ratio > 1.0f)
+							node->ratio = 1.0f;
+
+						if (data->io.axes.x)
+							node->scale.x += data->io.mouse.delta.y * -0.005f;		// invert the Y axes	
+						if (data->io.axes.y)
+							node->scale.y += data->io.mouse.delta.y * -0.005f;		// insert check for active axes, debug, zz
+						if (data->io.axes.z)
+							node->scale.z += data->io.mouse.delta.y * -0.005f;
+					}
+				}
+			}
+			else if (node->branchLevel >= 2)
+			{
+				if (data->io.mouse.mode == kNPmouseModeDragXZ)
 				{
 					node->ratio += data->io.mouse.delta.x * 0.001f;
 					if (node->ratio < 0.01f)
@@ -748,33 +861,144 @@ void UpdateNodeWithMouse (NPnodePtr node, pData dataRef)
 					if (data->io.axes.z)
 						node->scale.z += data->io.mouse.delta.y * -0.005f;
 				}
-			}
-		}
-		else if (node->branchLevel >= 2)
-		{
-			if (data->io.mouse.mode == kNPmouseModeDragXZ)
-			{
-				node->ratio += data->io.mouse.delta.x * 0.001f;
-				if (node->ratio < 0.01f)
-					node->ratio = 0.01f;
-				if (node->ratio > 1.0f)
-					node->ratio = 1.0f;
+				else // kNPmouseModeDragXY
+				{
+					distFactor = 35.0f;
+						if (data->io.axes.x)
+							node->translate.x += dX * distFactor;
+						else if (data->io.axes.y && data->io.axes.z) //YZ
+							node->translate.z += dX * distFactor;
 
-				if (data->io.axes.x)
-					node->scale.x += data->io.mouse.delta.y * -0.005f;		// invert the Y axes	
-				if (data->io.axes.y)
-					node->scale.y += data->io.mouse.delta.y * -0.005f;		// insert check for active axes, debug, zz
-				if (data->io.axes.z)
-					node->scale.z += data->io.mouse.delta.y * -0.005f;
-			}
-			else // kNPmouseModeDragXY
-			{
-				distFactor = 50.0f;		// fixed movement
-				node->translate.x += dX * distFactor;			
-				node->translate.y += -dY * distFactor;
+						if (data->io.axes.y)
+							node->translate.y += -dY * distFactor;
+						else if (data->io.axes.x && data->io.axes.z) //XZ
+							node->translate.z += -dY * distFactor;
+
+						if (!data->io.axes.x && !data->io.axes.y && data->io.axes.z) //Z
+							node->translate.z += (dX + -dY + dZ) * distFactor;	
+					
+				}
 			}
 		}
 	}
+	else 
+	{
+		switch (data->io.mouse.tool)
+		{
+			case kNPtoolMove :
+				if (node->branchLevel == 0)
+				{
+					distFactor = cam->proximity.x * 0.1f; // movement scaled by distance to cam
+				
+					if (data->io.mouse.buttonR)
+						node->translate.z += dZ * distFactor;
+					else 
+					{
+						if (!(data->io.axes.x && data->io.axes.y))
+						{
+							if (!data->io.axes.x && !data->io.axes.y && data->io.axes.z)
+								node->translate.z += (dX + -dY + dZ) * distFactor;
+							else if (!data->io.axes.x)		//YZ only move Y, not Z
+							{
+								//	node->translate.z += dX * distFactor;
+								dX = 0.0f; //turn off X for the XY plane following this
+							}
+							else if (data->io.axes.x && data->io.axes.z) //XZ
+							{
+								node->translate.z += -dY * distFactor;
+								dY = 0.0f; //turn off X for the XY plane following this
+							}
+						}
+						
+						if (data->io.axes.x || data->io.axes.y)
+						{
+							if (!data->io.axes.y)
+								dY = 0.0f;
+							// update the translateVec for selected objects
+							// optimize by calculating once (at camera?) and use for all nodes, debug, zz
+							node->translate.x += ( cosY * dX - sinY * dY ) * distFactor;			
+							node->translate.y += ( -sinY * dX - cosY * dY ) * distFactor;
+						}
+					}
+				}
+				else if ( parent->topo == kNPtopoPin || parent->topo == kNPtopoNull 	//zz debug remove kNPtopoNULL?
+						 || parent->topo == kNPtopoRod )
+				{
+					distFactor = cam->proximity.x;
+					node->translate.x -= dY * distFactor;	//-= to invert mouse Y
+				}
+				else
+				{
+					if (data->io.mouse.buttonR)
+					{
+						//could make this not whatever the left button is, zz debug
+						distFactor = 35.0f;
+						node->translate.z += (dX + -dY + dZ) * distFactor;	
+					}
+					else
+					{
+						distFactor = 35.0f;
+						if (data->io.axes.x)
+							node->translate.x += dX * distFactor;
+						else if (data->io.axes.y && data->io.axes.z) //YZ
+							node->translate.z += dX * distFactor;
 
+						if (data->io.axes.y)
+							node->translate.y += -dY * distFactor;
+						else if (data->io.axes.x && data->io.axes.z) //XZ
+							node->translate.z += -dY * distFactor;
+
+						if (!data->io.axes.x && !data->io.axes.y && data->io.axes.z) //Z
+							node->translate.z += (dX + -dY + dZ) * distFactor;	
+					}
+				}
+				break;
+			case kNPtoolRotate :
+				if (data->io.mouse.buttonR)
+				{
+					distFactor = 35.0f;
+					node->rotate.z += (dX + dY + dZ) * distFactor;	
+				}
+				else
+				{
+					distFactor = 35.0f;
+					if (data->io.axes.x)	//inverted mouse Y
+						node->rotate.x += -dY * distFactor;	//swapped XY axes
+					else if (data->io.axes.y && data->io.axes.z) //YZ
+						node->rotate.z += -dY * distFactor;
+
+					if (data->io.axes.y)
+						node->rotate.y += dX * distFactor;
+					else if (data->io.axes.x && data->io.axes.z) //XZ
+						node->rotate.z += dX * distFactor;
+
+					if (!data->io.axes.x && !data->io.axes.y && data->io.axes.z) //Z
+						node->rotate.z += (dX + dY + dZ) * distFactor;	
+				}
+				break;
+			case kNPtoolSize :
+				//use both mouse delta X (inverted) and Y 
+				deltaSum = -data->io.mouse.delta.x + data->io.mouse.delta.y;
+				if (data->io.mouse.buttonR)
+				{
+					node->ratio += deltaSum * -0.001f;
+					if (node->ratio < 0.01f)
+						node->ratio = 0.01f;
+					if (node->ratio > 1.0f)
+						node->ratio = 1.0f;
+				}
+				else
+				{
+					if (data->io.axes.x)
+						node->scale.x += deltaSum * -0.005f;		// invert the Y axes	
+					if (data->io.axes.y)
+						node->scale.y += deltaSum * -0.005f;		// insert check for active axes, debug, zz
+					if (data->io.axes.z)
+						node->scale.z += deltaSum * -0.005f;
+				}
+				break;
+			default : break;
+		}
+	}
 }
 

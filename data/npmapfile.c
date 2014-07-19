@@ -145,19 +145,20 @@ int npImportMapFile (FILE* file, int type, void* dataRef)
 
 //recursively traverses tree for all child branches
 //------------------------------------------------------------------------------
-int npMapTraverseTree (char* buffer, NPnodePtr node, int format, void* dataRef)
+int npMapTraverseTree (char* buffer, pNPnode node, int format, void* dataRef)
 {
 	int i = 0;
 	int count = 0;
 
 	// if not root then write the data, root has already been written
 	if (node->branchLevel > 0)
-			count += npWriteNode (buffer, node, format, dataRef);
+		count += npWriteNode (buffer, node, format, dataRef);
 
 	//recursively calls this function for all children
 	for (i=0; i < node->childCount; i++)//node->childCount; j++)
 	{
-		if (node->child[i] != NULL)
+		if (node->child[i] != NULL
+			&& node->child[i]->child[0] != node)	//don't write twice, this is link B so skip
 			count += npMapTraverseTree (buffer+count, node->child[i], format, dataRef);	
 	}
 
@@ -276,7 +277,7 @@ int npGetMapFile (char* buffer, int wordSize, int size, void* dataRef)
 	int type = 0;
 	int count = 0;
 
-	NPnodePtr node = NULL;
+	pNPnode node = NULL;
 	pData data = (pData) dataRef;
 
 /*	data->io.write[kNPcamera] = bufferA [kNPmapFileBufferMax]);
@@ -312,10 +313,13 @@ int npGetMapFile (char* buffer, int wordSize, int size, void* dataRef)
 	{
 		node = data->map.node[i];
 
-		count += npWriteNode ((buffer + count), node, kNPmapNodeCSV, dataRef);
+		if (node->type != kNodeHUD)										//zz debug
+		{
+			count += npWriteNode ((buffer + count), node, kNPmapNodeCSV, dataRef);
 
-		if (node->childCount)
-			count += npMapTraverseTree ((buffer + count), node, kNPmapNodeCSV, dataRef);
+			if (node->childCount)
+				count += npMapTraverseTree ((buffer + count), node, kNPmapNodeCSV, dataRef);
+		}
 	}
 
 	return count;
@@ -366,7 +370,7 @@ void npMapSortAdd (int id, int parentID, void* nodeRef, void* dataRef)
 {
 	int count = 0;
 
-	NPnodePtr node = (NPnodePtr) nodeRef;
+	pNPnode node = (pNPnode) nodeRef;
 	pData data = (pData) dataRef;
 
 	if (id < 0 || id >= kNPnodeMax)
@@ -384,7 +388,8 @@ void npMapSortAdd (int id, int parentID, void* nodeRef, void* dataRef)
 	data->map.sortID[id] = nodeRef;
 
 	// if orphan then add to list
-	if (node->parent == data->map.node[kNPnodeRootNull] )
+	if (node->parent == data->map.node[kNPnodeRootNull]
+		|| node->type == kNodeLink )				//always add link nodes
 	{	
 		// make sure in bounds of list max
 		count = data->map.orphanCount;
@@ -405,7 +410,7 @@ void npMapSortAdd (int id, int parentID, void* nodeRef, void* dataRef)
 }
 
 //-----------------------------------------------------------------------------
-NPnodePtr npMapSortID (int id, void* dataRef)
+pNPnode npMapSortID (int id, void* dataRef)
 {
 	pData data = (pData) dataRef;
 
@@ -425,11 +430,11 @@ NPnodePtr npMapSortID (int id, void* dataRef)
 
 //update node branchLevel based on parent level, traverses all sub-child nodes
 //-----------------------------------------------------------------------------
-void npNodeUpdateBranchLevel (NPnodePtr node)
+void npNodeUpdateBranchLevel (pNPnode node)
 {
 	int i = 0;
 
-	NPnodePtr parent = node->parent;
+	pNPnode parent = node->parent;
 	
 	if (parent == NULL)
 		node->branchLevel = 0;
@@ -447,11 +452,12 @@ void npNodeUpdateBranchLevel (NPnodePtr node)
 
 
 //-----------------------------------------------------------------------------
-void npNodeMoveBranch (NPnodePtr node, NPnodePtr newParent, void* dataRef)
+void npNodeMoveBranch (pNPnode node, pNPnode newParent, void* dataRef)
 {
 	int i = 0;
 	int childIndex = 0;
 	int parentIndex = 0;
+	char msg[256];
 
 	pData data = (pData) dataRef;
 
@@ -463,12 +469,13 @@ void npNodeMoveBranch (NPnodePtr node, NPnodePtr newParent, void* dataRef)
 		
 	if (newParent->childCount >= kNPnodeChildMax)
 	{
-		printf ("err 4836 - kNPnodeChildMax, cannot add to parent\n");
+		sprintf(msg, "err 4836 - kNPnodeChildMax hit: %d max", kNPnodeChildMax);
+		npPostMsg(msg, kNPmsgErr, data);
 		return;
 	}
 
 	//remove node from parent old parent
-	npNodeRemove(0, node, data);
+	npNodeRemove (false, node, data);
 
 	//attach to new parent
 	node->parent = newParent;
@@ -483,14 +490,16 @@ void npNodeMoveBranch (NPnodePtr node, NPnodePtr newParent, void* dataRef)
 //			node->id, node->branchLevel, newParent->id );
 }
 
+//attach orhan nodes to their parent after loading all file records
 //-----------------------------------------------------------------------------
 void npMapSort(void* dataRef)
 {
 	int i = 0;
 	int parentIndex = 0;
 
-	NPnodePtr node = NULL;
-	NPnodePtr nodeParent = NULL;
+	pNPnode node = NULL;
+	pNPnode nodeParent = NULL;
+	pNPnode child = NULL;			//used for link B
 	pData data = (pData) dataRef;
 
 	//iterate through the orphanList
@@ -499,16 +508,45 @@ void npMapSort(void* dataRef)
 		node = data->map.sortID[data->map.orphanList[i]];
 		nodeParent = data->map.sortID[data->map.parentID[i]];
 
+		//some special processing for link nodes only
+		if (node->type == kNodeLink)
+		{
+			//we temporarily store link B childID in the childIndex
+			child = data->map.sortID[node->childIndex];
+			node->childIndex = 0;	//no longer need temp storage
+			
+			node->child[0] = child;
+		//	node->childCount++;
+
+			//attach node to link B end
+			npNodeAttach (node, child, data);
+
+			//if this is not an actual orphan the skip the rest
+			if (node->parent == nodeParent)
+				continue;
+		}
+
 		if (nodeParent != data->map.node[kNPnodeRootNull])
 		{
 			npNodeMoveBranch (node, nodeParent, data);
+
+			//compatability for files prior to 2012-04-22 with topo == 0
+			//other half of this procedure is in npReadMapCSVNode()
+			if (node->topo == 0 && node->type == kNodePin && nodeParent != NULL)
+			{
+				if ( nodeParent->topo == kNPtopoPin || nodeParent->topo == 0
+					|| nodeParent->topo == kNPtopoTorus )
+					node->topo = kNPtopoTorus;
+				else
+					node->topo = kNPtopoPin;
+			}
 
 			printf ("orphan id: %d attached to parent id: %d\n", 
 				data->map.orphanList[i], data->map.parentID[i] );
 		}
 		else
 		{
-			npNodeDelete(node, dataRef);
+			npNodeDelete (node, dataRef);
 			data->map.sortID[i] = NULL;
 
 			printf ("err 4838 - orphan id: %d   missing parent id: %d\n",
@@ -577,9 +615,9 @@ void* npMapNodeAdd (int id, int type, int branchLevel, int parentID,
 	int childIndex = 0;
 
 	//node tree pointers
-	NPnodePtr nodeParent = NULL;
-	NPnodePtr node = NULL;
-	NPnodePtr nodeChild = NULL;
+	pNPnode nodeParent = NULL;
+	pNPnode node = NULL;
+	pNPnode nodeChild = NULL;
 	
 	pData data = (pData) dataRef;
 
@@ -617,7 +655,7 @@ void* npMapNodeAdd (int id, int type, int branchLevel, int parentID,
 	if( branchLevel == 1 )
 	{
 		// if parent is NULL then returns the nodeRootNull
-		nodeParent = npMapSortID(parentID, dataRef);
+		nodeParent = npMapSortID (parentID, dataRef);
 
 		switch (type)
 		{
@@ -665,7 +703,7 @@ void* npMapNodeAdd (int id, int type, int branchLevel, int parentID,
 }
 
 //-----------------------------------------------------------------------------
-void npMapCSVvOne(NPnodePtr node)
+void npMapCSVvOne(pNPnode node)
 {
 	NPgridPtr gridData = NULL;
 
@@ -970,7 +1008,8 @@ void* npReadMapNodeCSV (char* buffer, int wordSize, int size,
 	int tagMode, formatID, tableID, recordID, lineSize;
 
 	//node tree pointers
-	NPnodePtr node = NULL;
+	pNPnode node = NULL;
+	pNPnode nodeParent = NULL;
 	pData data = (pData) dataRef;
 
 	//Scan Whole Line in 
@@ -1156,6 +1195,28 @@ void* npReadMapNodeCSV (char* buffer, int wordSize, int size,
 	if (format == kNPmapNodeCSVvOne)
 		npMapCSVvOne (node);
 
+	//file compatability prior to 2012-04-22
+	if (node->topo == 0 && node->type == kNodePin)
+	{
+		//printf ("topo = 0   id: %d\n", node->id);
+		if (node->branchLevel == 0)
+			node->topo = kNPtopoPin;	//set root topo to a pin
+		else if (node->parent != NULL)  //orhpan child methods in npMapSort
+		{
+			nodeParent = node->parent;
+			if ( nodeParent->topo == kNPtopoPin || nodeParent->topo == 0
+				|| nodeParent->topo == kNPtopoTorus )
+				node->topo = kNPtopoTorus;
+			else
+				node->topo = kNPtopoPin;
+		}
+	}
+
+	//workaround for keeping track of link end B, processed by orphan list
+	if (node->type == kNodeLink)
+		node->childIndex = childID;
+
+	//for sorting orphan nodes
 	nodeCount = ++data->map.sortCount;
 
 	//print part of the first few lines of data
@@ -1178,7 +1239,7 @@ void npLoadMapFile (char* buffer, int wordSize, int size, void* dataRef)
 	int nodeCount = 0;
 	int format = 0;
 	
-	NPnodePtr node = NULL;
+	pNPnode node = NULL;
 	pData data = (pData) dataRef;
 
 
@@ -1245,7 +1306,7 @@ void npLoadMapFile (char* buffer, int wordSize, int size, void* dataRef)
 	if ( format == kNPmapNodeCSVvOne )
 	{
 		node = data->map.node[kNPnodeRootCamera];
-		data->map.activeCam = node->child[node->childIndex];
+		data->map.currentCam = node->child[node->childIndex];
 		npSelectNode (data->map.node[kNPnodeRootGrid], data);
 	}
 
@@ -1266,7 +1327,7 @@ void npLoadTagFile (char* buffer, int wordSize, int size, void* dataRef)
 	int recordCount = 0;
 	int version = 0;
 	
-	NPnodePtr node = NULL;
+	pNPnode node = NULL;
 	pData data = (pData) dataRef;
 
 	pNPrecordTag recordTag = NULL;
@@ -1444,7 +1505,7 @@ int npFileSaveMap (char* filePath, int wordSize, int size, void* dataRef)
 	FILE* file = NULL;
 
 	pData data = (pData) dataRef;
-	NPnodePtr node = NULL;
+	pNPnode node = NULL;
 
 	char* buffer = (char*) malloc(kNPmapFileBufferMax);
 	if (buffer == NULL)
@@ -1548,9 +1609,10 @@ int npWriteNode (char* buffer, void* nodeRef, int format, void* dataRef)
 {
 	int n			= 0;
 	int parentID	= 0;
+	int childID		= 0;
 
-	NPnodePtr parent = NULL;
-	NPnodePtr node = (NPnodePtr) nodeRef;
+	pNPnode parent = NULL;
+	pNPnode node = (pNPnode) nodeRef;
 
 	pData data = (pData) dataRef;
 
@@ -1561,12 +1623,13 @@ int npWriteNode (char* buffer, void* nodeRef, int format, void* dataRef)
 
 	// set the parentID, if NULL it will be zero
 	if (node->parent != NULL)
-	{
-		parent = node->parent;
-		parentID = parent->id;
+		parentID = node->parent->id;
 
-		// printf ("parentID %d\n", parentID);
-	}
+	// if a kNodeLink then the childID is set to the link B id
+	if (node->type == kNodeLink)
+		childID = node->child[0]->id;
+	else
+		childID = node->id;		//otherwise the id is the same as this node
 /*
 	switch (format)
 	{	
@@ -1594,7 +1657,7 @@ int npWriteNode (char* buffer, void* nodeRef, int format, void* dataRef)
 		node->selected,
 		parentID,					// parent id replaces pointer to parent
 		node->branchLevel,
-		node->id,					// node->id is same as childList->id
+		childID,					// either same as the node or id of link end B
 		node->childIndex,
 		node->childCount,
 		
@@ -1680,15 +1743,12 @@ int npWriteNode (char* buffer, void* nodeRef, int format, void* dataRef)
 	n += sprintf ((nodePtr + n), ",%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
 		node->hide,
 		node->freeze,
-//		node->center,
 		node->topo,
 		node->facet,
 
 		node->autoZoom.x,
 		node->autoZoom.y,
 		node->autoZoom.z,
-
-//		node->scroll,
 		
 		node->triggerHi.x,
 		node->triggerHi.y,

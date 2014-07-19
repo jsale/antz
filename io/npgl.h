@@ -53,5 +53,8 @@ void npPick (int x, int y, void* dataRef);
 
 void npResizeConsole (void* dataRef);
 
+void npPostMode (pNPnode node, void* dataRef);
+void npPostTool (pNPnode node, void* dataRef);
+
 #endif
 

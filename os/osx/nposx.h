@@ -28,10 +28,16 @@
 #include "../../npdata.h"
 
 
+void npOSXSetCWD (char* buffer);  //voidptr
 void npOSXGetCWD (char* buffer, int* size);
 
+void npOSXGetTime();
 void npOSXUpdateTime (void* dataRef);
 void npOSXSleep (double seconds);
+
+void npOSXGetAppPath (char* buffer, int* size);
+void npOSXGetOpenFilePath (char* buffer, int* size, void* dataRef);
+void npOSXSetOpenFilePath (char* buffer, void* dataRef);
 
 FILE* npOSXFileDialog (const char* fileName, int dialogType, void* dataRef);
 

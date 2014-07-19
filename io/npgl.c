@@ -47,40 +47,45 @@ void npLoadTextures(void* dataRef)
 {
 	int textureSize = 0;
 	int fileNumber = 1;
-	char* filename = (char*)malloc(4096);
-
+	char filePath[2200] = {'\0'};
+	int* size;
+	char* filename = (char*)malloc(500);
+	
 	unsigned int textureID;									// texture, debug zz
-
-											//zz debug, allow loading textures at runtime, 
-											//use data->io.file.mapPath
+	
+	//zz debug, allow loading textures at runtime, 
+	//use data->io.file.mapPath
 	pData data = (pData) dataRef;
-
+	
 	glGetIntegerv (GL_MAX_TEXTURE_SIZE, &textureSize);
 	printf ("\nMax Texture Size: %dx%d\n", textureSize, textureSize);
 	printf ("Larger textures down converted\n", textureSize);
-
+	
+	nposGetAppPath(filePath, &size);
 	printf ("\nSearching For Textures\n");
 	// load our texture		// texture, debug zz
-	for (fileNumber = 1; fileNumber <= kNPtextureMax; fileNumber++)
+	for (fileNumber = 1; fileNumber <= 9; fileNumber++)
 	{
 		//append the file number, deals with the leading zeros
 		if (fileNumber < 10)
-			sprintf (filename, "antzmaps/map0000%d.jpg", fileNumber);
+			sprintf (filename, "%santzmaps/map0000%d.jpg", filePath, fileNumber);	//zz-osx debug
 		else if (fileNumber < 100)
-			sprintf (filename, "antzmaps/map000%d.jpg", fileNumber);
+			sprintf (filename, "%santzmaps/map000%d.jpg", filePath, fileNumber);	//zz-osx debug
 		else if (fileNumber < 1000)
-			sprintf (filename, "antzmaps/map00%d.jpg", fileNumber);
+			sprintf (filename, "%santzmaps/map00%d.jpg", filePath, fileNumber);		//zz-osx debug
 		else if (fileNumber < 10000)
-			sprintf (filename, "antzmaps/map0%d.jpg", fileNumber);
-
-		textureID = SOIL_load_OGL_texture
-		(
-			filename,
-			SOIL_LOAD_AUTO,
-			SOIL_CREATE_NEW_ID,
-			SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y
-			| SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
-		);																// texture, debug zz
+			sprintf (filename, "%santzmaps/map0%d.jpg", filePath, fileNumber);		//zz-osx debug
+		else if (fileNumber < 100000)
+			sprintf (filename, "%santzmaps/map%d.jpg", filePath, fileNumber);		//zz-osx debug
+		
+		textureID = SOIL_load_OGL_texture(
+										  filename,
+										  SOIL_LOAD_AUTO,
+										  SOIL_CREATE_NEW_ID,
+										  //	SOIL_FLAG_MIPMAPS |
+										  SOIL_FLAG_INVERT_Y	// | SOIL_FLAG_NTSC_SAFE_RGB
+										  // | SOIL_FLAG_COMPRESS_TO_DXT	//turn off the lossy compression
+										  );																// texture, debug zz
 		
 		//the last texture loaded is the texture count, non-loads return a texture=0
 		if (textureID)
@@ -89,12 +94,12 @@ void npLoadTextures(void* dataRef)
 			printf ("Loaded textureID: %d\n", textureID);
 		}
 	}
-
+	
 	if (data->io.gl.textureCount)
 		printf ("Done Loading Textures\n\n");
 	else
 		printf ("Could Not Find Textures\n\n");
-
+	
 }
 
 
@@ -131,22 +136,24 @@ void npGLResizeScene (int width, int height)
 	static int resizeCount = 0;
 	char msg[128];
 
-	int camIndex = 1;	//update with list in data->io->view.camIndex[]		debug zz
 	GLfloat ratio = 1.0;
 
 	pData data = npGetDataRef();
 
-	NPnodePtr camNode = data->map.node[camIndex];
+	pNPnode camNode = data->map.currentCam;
 	NPcameraPtr camData = camNode->data;
 
 	data->io.gl.width = width;
 	data->io.gl.height = height;
 
-//	if (resizeCount++ > 2)
+	if (resizeCount++ > 2)
 	{
-		sprintf(msg, "GL Resize: %dx%d\n", width, height);
+		sprintf(msg, "Resize: %dx%d\n", width, height);
 		npPostMsg(msg, kNPmsgGL, data);
 	}
+	else if (resizeCount == 2)			//startup message
+		npPostMsg("hint: click the Indicators to change XYZ Axes, Mode or Tool (also Mouse Wheel)",
+					kNPmsgCtrl, data);
 
 	if (height > 0)							//prevent divide by zero
 		camData->aspectRatio = (GLfloat)width / (GLfloat)height;
@@ -243,7 +250,7 @@ void npGLLighting (void* dataRef)
 
 
 //------------------------------------------------------------------------------
-void npGLShading (dataRef)
+void npGLShading (void* dataRef)
 {
 	pData data = (pData) dataRef;
 
@@ -281,19 +288,18 @@ void npGLShading (dataRef)
 void npGLDrawScene (void* dataRef) 
 {
 	int err = 0;
-	//MB-LABEL
-	NPfloatXYZ	trans;
-	NPfloatXYZA rot;
-	//MB-END
 	
-	int	camIndex = 1;
 	GLfloat upX = 0.0f, upY = 0.0f, upZ = 1.0f;
 	GLfloat angle = 0.0;
 
 	pData data = (pData) dataRef;
-	NPnodePtr camNode = npGetActiveCam (data);
+	pNPnode camNode = npGetActiveCam (data);
+	NPcameraPtr camData = camNode->data;
 
 	//MB-LABEL
+	NPfloatXYZ	trans;
+	NPfloatXYZA rot;
+
 	trans.x = 0.0f;	
 	trans.y = 0.0f;
 	trans.z = 100.0f;
@@ -301,8 +307,9 @@ void npGLDrawScene (void* dataRef)
 	rot.y	= 0.0f;
 	rot.z	= -1.0f;
 	rot.angle = 0.0f;
+	//MB-END
 	
-#define BUGFIX_MATRIX 0.0000000001
+#define BUGFIX_MATRIX 0.0000000001	//prevents 0 vector issue
 
 	glMatrixMode(GL_MODELVIEW);
 
@@ -318,6 +325,10 @@ void npGLDrawScene (void* dataRef)
 					camNode->translate.y + camNode->rotateVec.y + BUGFIX_MATRIX,
 					camNode->translate.z + camNode->rotateVec.z,
 					upX, upY, upZ );
+	
+		//inverse view matrix used to convert local coordinates to world coords
+		glGetFloatv (GL_MODELVIEW_MATRIX, camData->matrix);
+		npInvertMatrixf (camData->matrix, camData->inverseMatrix);
 
 		npGLLighting (dataRef);
 		npGLShading (dataRef);
@@ -333,13 +344,18 @@ void npGLDrawScene (void* dataRef)
 				camNode->translate.y + camNode->rotateVec.y + BUGFIX_MATRIX,
 				camNode->translate.z + camNode->rotateVec.z,
 				upX, upY, upZ );
+		
+	//inverse view matrix used to convert local coordinates to world coordinates
+	glGetFloatv (GL_MODELVIEW_MATRIX, camData->matrix);
+	npInvertMatrixf (camData->matrix, camData->inverseMatrix);
 
 	npGLLighting (dataRef);				//set lights
 	npGLShading (dataRef);				//set transparency
 	npDrawNodes (dataRef);				//draws mesh, graphs, pins, etc...
 
+	//	glOrtho ( -20.0f, 20.0f, -20.0f, 20.0f, -1.0f, 1.0f); // gluOrtho2D	//zz debug
 
-	//	glOrtho ( -20.0f, 20.0f, -20.0f, 20.0f, -1.0f, 1.0f); // gluOrtho2D
+	//MB-LABEL
 	//HUD LookAt Camera
 	glPushMatrix();
 		glLoadIdentity();
@@ -371,14 +387,23 @@ void npCopyGPUtoCPU (void* dataRef)
 }
 
 //------------------------------------------------------------------------------
-void npHideSubNodes (bool hide, NPnodePtr node, void* dataRef)
+void npHideSubNodes (bool hide, pNPnode node, void* dataRef)
 {
 	int i = 0;
-	NPnodePtr child = NULL;
+	bool allSubNodesHidden = true;
+	pNPnode child = NULL;
+
+	//normally clicked node should not be hidden, but just in case...
+	if (!hide)
+		node->hide = false;
 
 	for (i=0; i < node->childCount; i++)
 	{
 		child = node->child[i];
+
+		//picked node should be hidden only if all sub nodes already hidden
+		if (!child->hide)
+			allSubNodesHidden = false;
 
 		// recursively call this function
 		npHideSubNodes (hide, child, dataRef);
@@ -386,57 +411,457 @@ void npHideSubNodes (bool hide, NPnodePtr node, void* dataRef)
 		// apply passed in function operation to node
 		child->hide = hide;
 	}
+
+	//picked node should be hidden only if all sub nodes already hidden
+	if (hide && allSubNodesHidden)
+		node->hide = true;
+	else
+		node->hide = false;
+}
+
+//------------------------------------------------------------------------------
+void npPostTool (pNPnode node, void* dataRef)
+{
+	pData data = (pData) dataRef;
+
+	char msg[128];
+
+	
+	strcpy (msg, "tool: ");
+
+	switch (data->io.mouse.tool)
+	{
+		case kNPtoolNull :
+			strcat (msg, "None     ");
+			break;
+		case kNPtoolCombo :
+			strcat( msg, "Combo    ");
+			npPostMsg("L-drag background for Camera Examiner XY, L+R-drag for XZ, R-drag for Fly",kNPmsgHint,data);
+			npPostMsg("L-click Pin select, R-click multiple, L/R/L+R-drag to move, rotate, scale, ratio",kNPmsgHint,data);	//insert blank space
+			break;
+
+		case kNPtoolCreate :
+			strcat (msg, "Create   ");
+			npPostMsg("L-drag or R-drag objects (same as Combo Tool), mouse-drag background for Camera",kNPmsgHint,data);
+			npPostMsg("L-click creates New node, R-click to Delete",kNPmsgHint,data);
+			break;
+//		case kNPtoolDelete :
+//			strcat (msg, "Delete   ");
+//			strcpy (hint,"delete all selected nodes and all branches");
+//			break;
+		case kNPtoolLink :
+			strcat (msg, "Link     ");
+			npPostMsg("",kNPmsgHint,data);
+			npPostMsg("L-click to Select A then Select B, R-click to Cancel (re-select A)",kNPmsgHint,data);
+			break;	
+		case kNPtoolMove :
+			strcat (msg, "Move     ");
+			npPostMsg("",kNPmsgHint,data);
+			npPostMsg("L-drag Move in XY, R-drag for XZ",kNPmsgHint,data);
+			break;
+		case kNPtoolRotate :
+			strcat (msg, "Rotate   ");
+			npPostMsg("",kNPmsgHint,data);
+			npPostMsg("L-drag Rotate XY, R-drag for Z",kNPmsgHint,data);
+			break;
+		case kNPtoolSize :
+			strcat (msg, "Size     ");
+			npPostMsg("",kNPmsgHint,data);
+			npPostMsg("L-drag Scale XYZ axes or R-drag for torus Ratio",kNPmsgHint,data);
+			break;
+
+		case kNPtoolPick :
+			strcat (msg, "Pick     ");
+			npPostMsg("",kNPmsgHint,data);
+			npPostMsg("L-click to Pick single object, R-click for multiple",kNPmsgHint,data);
+			break;
+		case kNPtoolInfo :
+			strcat (msg, "Info     ");
+			npPostMsg("",kNPmsgHint,data);
+			npPostMsg("L-click toggles Text Tag, R-click hides Tag",kNPmsgHint,data);
+			break;
+		case kNPtoolHide :
+			strcat (msg, "Hide     ");
+			npPostMsg("",kNPmsgHint,data);
+			npPostMsg("'~' key to Show ALL, '4' Hide ALL at branch level > 1",kNPmsgHint, data); //zz debug
+			npPostMsg("L-click Show branches, R-click Hide branches",kNPmsgHint,data);
+			break;
+
+		case kNPtoolTopo :
+			strcat (msg, "Topo     ");
+			npPostMsg("",kNPmsgHint,data);
+			npPostMsg("L-click next Topo type, R-click previous",kNPmsgHint,data);
+			break;
+		case kNPtoolGeometry :
+			strcat (msg, "Geometry ");
+			npPostMsg("Geometry does not effect Topology",kNPmsgHint, data); //zz debug
+			npPostMsg("L-click next Geometry type, R-click previous",kNPmsgHint,data);
+			break;
+//		case kNPtoolSegments :
+//			strcat (msg, "Segments ");
+//			break;
+
+		case kNPtoolColor :
+			strcat (msg, "Color    ");
+			npPostMsg("",kNPmsgHint,data);
+			npPostMsg("L-click next Color index, R-click previous",kNPmsgHint,data);
+			break;
+		case kNPtoolAlpha :
+			strcat (msg, "Alpha    ");
+			npPostMsg("",kNPmsgHint,data);
+			npPostMsg("L-click reduces Alpha tranparency color, R-click increases opacity",kNPmsgHint,data);
+			break;
+		case kNPtoolTexture :
+			strcat (msg, "Texture  ");
+			npPostMsg("",kNPmsgHint,data);
+			npPostMsg("L-click next Topo type, R-click previous",kNPmsgHint,data);
+			break;
+		case kNPtoolChannel :
+			strcat (msg, "Channel  ");
+			npPostMsg("",kNPmsgHint,data);
+			npPostMsg("L-click next Channel, R-click previous",kNPmsgHint,data);
+			break;
+
+		case kNPtoolFreeze :
+			strcat (msg, "Freeze   ");
+			npPostMsg("",kNPmsgHint,data);
+			npPostMsg("L-click Freezes node, R-click un-Freezes",kNPmsgHint,data);
+			break;
+		case kNPtoolSetpointHi :
+			strcat (msg, "Set High ");
+			npPostMsg("",kNPmsgHint,data);
+			npPostMsg("L-click to Set Upper Limit, R-click clears Setpoint",kNPmsgHint,data);
+			break;
+		case kNPtoolSetpointLo :
+			strcat (msg, "Set Low  ");
+			npPostMsg("",kNPmsgHint,data);
+			npPostMsg("L-click to Set Lower Limit, R-click clears Setpoint",kNPmsgHint,data);
+			break;
+
+		default :
+			strcat (msg, "Other    ");
+			break;
+	}
+
+	//update the GUI tool type indicator
+	if (node == NULL)
+	{
+		node = data->map.node[kNPnodeRootHUD];	//select Root HUD node
+		node = node->child[kNPhudTool];			//select Tool node
+	}
+	strcpy (node->tag->title, msg);
+	npUpdateTextTag (node->tag, dataRef);
+
+	//post the tool type message
+	npPostMsg (msg, kNPmsgCtrl, dataRef);
+}
+
+//------------------------------------------------------------------------------
+void npPostMode (pNPnode node, void* dataRef)
+{
+	char msg[128];
+	pData data = (pData) dataRef;
+	
+	strcpy (msg, "mode: ");
+
+	switch (data->io.mouse.pickMode)
+	{
+		case kNPmodeNull :
+			strcat (msg, "None     ");
+			break;
+		case kNPmodeCamera :
+			npPostMsg("Camera mode allows navigating without effecting objects",kNPmsgHint,data);
+			npPostMsg("'N' key will create New sub-object Cameras",kNPmsgHint,data);
+			strcat (msg, "Camera   ");
+			break;
+		case kNPmodeGrid :
+			npPostMsg("the Grid currently only responds to keyboard commands",kNPmsgHint,data);
+			npPostMsg("pressing 'Z' or Shift+Z will expand or compact entire scene height",kNPmsgHint,data);
+			strcat (msg, "Grid     ");
+			break;
+		case kNPmodePin :
+			npPostMsg("use either the mouse or keyboard to create, delete or modify objects",kNPmsgHint,data);
+			npPostMsg("all 'tool' types effect Pin objects",kNPmsgHint,data);
+			strcat (msg, "Pin      ");
+			break;
+		default :
+			strcat (msg, "Other    ");
+			break;
+	}
+
+	//update the GUI mode type indicator
+	strcpy (node->tag->title, msg);
+	npUpdateTextTag (node->tag, dataRef);
+
+	//post the tool type message
+	npPostMsg (msg, kNPmsgCtrl, dataRef);
+}
+
+//------------------------------------------------------------------------------
+void npPostAxes (void* dataRef)
+{
+	char msg[64];
+	pData data = (pData) dataRef;
+	
+	strcpy (msg, "axes: ");
+
+	if (data->io.axes.x)
+		strcat (msg, "X");
+	if (data->io.axes.y)
+		strcat (msg, "Y");
+	if (data->io.axes.z)
+		strcat (msg, "Z");
+
+	if (!data->io.axes.x && !data->io.axes.y && !data->io.axes.z)
+		strcat (msg, "None");
+
+	npPostMsg (msg, kNPmsgCtrl, dataRef);
+}
+
+//------------------------------------------------------------------------------
+void npPickHUD (pNPnode node, void* dataRef)
+{
+//	char msg[256];
+	pData data = (pData) dataRef;
+	
+	switch (node->hudType)
+	{
+		case kNPhudCompass :
+			node->childIndex = 1 - node->childIndex;						//zz debug
+			if (node->childIndex)
+				npPostMsg("Display Heading",kNPmsgCtrl,data);
+			else
+				npPostMsg("Display Compass",kNPmsgCtrl,data);
+			break;
+		case kNPhudAngle :	//change to angle								zz debug
+			node->childIndex = 1 - node->childIndex;						//zz debug
+			if (node->childIndex)
+				npPostMsg("Display Ratio",kNPmsgCtrl,data);
+			else
+				npPostMsg("Display Tilt",kNPmsgCtrl,data);
+			break;
+		case kNPhudCoordX : 
+			data->io.axes.x = 1 - data->io.axes.x;
+			npPostAxes (data);
+			break;
+		case kNPhudCoordY :
+			data->io.axes.y = 1 - data->io.axes.y;
+			npPostAxes (data);
+			break;
+		case kNPhudCoordZ :
+			data->io.axes.z = 1 - data->io.axes.z;
+			npPostAxes (data);
+			break;
+		case kNPhudMode :
+			data->io.mouse.pickMode++;
+			if (data->io.mouse.pickMode >= kNPmodeCount)
+				data->io.mouse.pickMode = kNPmodeNull + 1;
+			if (data->io.mouse.pickMode == kNPmodeCamera)
+				npSelectNode(data->map.currentCam, data);
+			if (data->io.mouse.pickMode == kNPmodeGrid)	//update to not need thes, zz debug
+				npSelectNode(data->map.selectedGrid, data);
+			if (data->io.mouse.pickMode == kNPmodePin)
+				npSelectNode(data->map.selectedPinNode, data);
+			npPostMode (node, data);
+			npPostTool (NULL, data);
+			break;
+		case kNPhudTool :
+			if (data->io.mouse.pickMode != kNPmodeCamera)
+			{
+				if (data->io.mouse.buttonR)
+					data->io.mouse.tool--;
+				else
+					data->io.mouse.tool++;
+
+				if (data->io.mouse.tool >= kNPtoolCount)
+					data->io.mouse.tool = kNPtoolNull + 1;
+				if (data->io.mouse.tool <= kNPtoolNull)
+					data->io.mouse.tool = kNPtoolCount - 1;
+
+				npPostTool (node, data);
+			}
+			break;
+		default : break;
+	}
 }
 
 //set picked node params based on the mouse button and tool mode
 //------------------------------------------------------------------------------
-void npPickTool (NPnodePtr node, void* dataRef)
+void npPickTool (pNPnode node, void* dataRef)
 {
 	char msg[256];
 	pData data = (pData) dataRef;
 	
-	if (data->io.mouse.tool == kNPtoolNull)
+	if (node->type == kNodeHUD)
 	{
-		if (data->io.mouse.buttonR)
-			node->selected = 1 - node->selected;	//toggle value
-		else
-		{
-			//if node not selected then clear selection, then select
+		npPickHUD (node, data);
+		return;
+	}
+
+	//camera mode locks out modifying nodes
+	if (data->io.mouse.pickMode == kNPmodeCamera)
+		return;
+
+	switch (data->io.mouse.tool)
+	{
+		case kNPtoolCombo :			//in conjuction with picking
+		case kNPtoolMove :			//in conjuction with picking
+		case kNPtoolRotate :		//in conjuction with picking
+		case kNPtoolSize :			//in conjuction with picking
+		case kNPtoolPick :
+			if (data->io.mouse.buttonR)
+				node->selected = 1 - node->selected;	//toggle value
+			else
+			{		
+				//if node not selected then clear selection, then select
+				if (!node->selected)
+					npCtrlCommand (kNPcmdSelectNone, data);
+
+				node->selected = true;
+			}
+			break;
+
+		case kNPtoolCreate :
 			if (!node->selected)
 				npCtrlCommand (kNPcmdSelectNone, data);
+			data->io.mouse.createEvent = true;							//zz-s debug
+			break;
+		// case kNPtoolNew : npCtrlCommand (kNPcmdNew, data); break;
+		// case kNPtoolDelete : npCtrlCommand (kNPcmdDelete, data); break;
+		case kNPtoolLink :
+			if (node->type == kNodeLink)
+			{
+				npPostMsg ("Cannot Link a Link to a Link", kNPmsgCtrl, data);
+				break;
+			}
+			if (data->io.mouse.linkA == NULL)				//first pick A
+			{
+				if (node->childCount < kNPnodeChildMax)
+				{
+					data->io.mouse.linkA = node;
+					if (node->recordID)
+						sprintf(msg,"Link node A selected id: %d record_id: %d - now pick B",
+								node->id, node->recordID);
+					else
+						sprintf(msg,"Link node A selected id: %d - now pick B",
+								node->id);
+					npPostMsg (msg, kNPmsgCtrl, data);
+				}
+				else
+				{
+					sprintf(msg,"Cannot Link node A id: %d - exceeds child max",
+							node->id);
+					npPostMsg (msg, kNPmsgCtrl, data);
+					npPostMsg ("Pick new Link A", kNPmsgCtrl, data);
+					data->io.mouse.linkA = NULL;			//reset the process
+				}
+			}
+			else											//create link
+			{
+				if (   node->childCount < kNPnodeChildMax
+					&& data->io.mouse.linkA->childCount < kNPnodeChildMax)
+				{
+					node = npNodeNewLink (data->io.mouse.linkA, node, data);
+					if (node != NULL)
+					{
+						sprintf(msg, "New Link id: %d from id: %d to id: %d", 
+								node->id, node->parent->id, 
+								node->child[node->childIndex]->id);
+						npPostMsg (msg, kNPmsgCtrl, data);
+					}
+					data->io.mouse.linkA = NULL;				//reset the process
+				}
+				else
+				{
+					sprintf(msg,"Cannot Link node B id: %d - exceeds child max",
+							node->id);
+					npPostMsg (msg, kNPmsgCtrl, data);
+					npPostMsg ("Pick different Link B - or R-click to Cancel", kNPmsgCtrl, data);
+				}
+			}
+			break;
 
-			node->selected = true;
-		}
-	}
+		case kNPtoolInfo :
+			if (data->io.mouse.buttonR)
+				node->tagMode = 0;
+			else
+				node->tagMode++;
+			if (node->tagMode >= kNPtagModeCount)							//debug zz
+				node->tagMode = 1;
+			sprintf(msg, "Text Tag Mode: %d", node->tagMode);
+			npPostMsg (msg, kNPmsgCtrl, dataRef);
+			break;
 
-	if (data->io.mouse.tool == kNPtoolInfo)
-	{
-		if (data->io.mouse.buttonR)
-			node->tagMode = 0;
-		else
-			node->tagMode++;
-		if (node->tagMode >= kNPtagModeCount)					//debug zz
-			node->tagMode = 1;
-		sprintf(msg, "text tag type: %d", node->tagMode);
-		npPostMsg (msg, kNPmsgCtrl, dataRef);
-	}
+		case kNPtoolHide :
+			if (data->io.mouse.buttonR)
+			{
+				npHideSubNodes (true, node, data);
+				sprintf(msg, "Hide Branches");
+			}
+			else
+			{
+				npHideSubNodes (false, node, data);
+				sprintf(msg, "Show Branches");
+			}
+			npPostMsg (msg, kNPmsgCtrl, dataRef);
+			break;
 
-	if (data->io.mouse.tool == kNPtoolHide)
-	{
-		if (data->io.mouse.buttonR)
-		{
-		//	node->hide = true;
-			npHideSubNodes (true, node, data);
-			sprintf(msg, "Hide Branches");
-		}
-		else
-		{
-		//	node->hide = false;
-			npHideSubNodes (false, node, data);
-			sprintf(msg, "Show Branches");
-		}
-		
-		npPostMsg (msg, kNPmsgCtrl, dataRef);
+		case kNPtoolFreeze : npCtrlCommand (kNPcmdFreeze, data); break;
+
+		case kNPtoolSetpointHi :
+			if (data->io.mouse.buttonR)
+				npCtrlCommand (kNPcmdSetpointHiOff, data);
+			else
+				npCtrlCommand (kNPcmdSetpointHi, data);
+			break;
+		case kNPtoolSetpointLo :
+			if (data->io.mouse.buttonR)
+				npCtrlCommand (kNPcmdSetpointLoOff, data);
+			else
+				npCtrlCommand (kNPcmdSetpointLo, data);
+			break;
+
+		case kNPtoolTopo :
+			if (data->io.mouse.buttonR)
+				npCtrlCommand (kNPcmdTopoDown, data);
+			else
+				npCtrlCommand (kNPcmdTopo, data); 
+			break;
+		case kNPtoolGeometry :
+			if (data->io.mouse.buttonR)
+				npCtrlCommand (kNPcmdPrimitiveDown, data);
+			else
+				npCtrlCommand (kNPcmdGeometry, data);
+			break;
+
+//		case kNPtoolSegments :	npCtrlCommand (kNPcmdSegments, data); break;
+
+		case kNPtoolColor :
+			if (data->io.mouse.buttonR)
+				npCtrlCommand (kNPcmdColorDown, data);
+			else
+				npCtrlCommand (kNPcmdColorUp, data);
+			break;
+		case kNPtoolAlpha :
+			if (data->io.mouse.buttonR)
+				npCtrlCommand (kNPcmdAlphaUp, data);
+			else
+				npCtrlCommand (kNPcmdAlphaDown, data);
+			break;
+		case kNPtoolTexture :
+			if (data->io.mouse.buttonR)
+				npCtrlCommand (kNPcmdTextureDown, data);
+			else
+				npCtrlCommand (kNPcmdTexture, data);
+			break;
+		case kNPtoolChannel :
+			if (data->io.mouse.buttonR)
+				npCtrlCommand (kNPcmdChannelDown, data);
+			else
+				npCtrlCommand (kNPcmdChannelUp, data);
+			break;
+
+		default : break;
 	}
 
 	/*
@@ -461,14 +886,26 @@ void npPick (int x, int y, void* dataRef)
 	GLubyte r,g,b;	//Unsigned Byte 8-bit Range: 0-255 // changed from u_int8_t, zz debug
 	GLubyte pixels[4];		//4 Bytes
 	
-	NPnodePtr node = NULL;
+	pNPnode node = NULL;
 	pData data = (pData) dataRef;
 	
-	//set pickPass flag, causes draw routines to use node ID based flat-color
+	if (data->io.mouse.buttonR && data->io.mouse.tool == kNPtoolLink)
+	{
+		data->io.mouse.linkA = NULL;
+		npPostMsg ("Cancelled, select a new Link A", kNPmsgCtrl, data);
+		return;
+	}
+
+	//pickPass flag tells all object draw routines to use node ID mapped color
 	data->io.gl.pickPass = true;
 
+	//draw entire scene as flat 100% ambient with color mapped by node ID
+	//think of it as a draw picture by numbers coloring book
 	npGLDrawScene (data);			//optimize to draw only picked region, debug zz
 
+		//upgrade to read a 9x9 region as to allow picking near an object, zz debug
+		//then spiral out from the center looking for any object that is close
+		//must handle edges of screen
 	//read the pixel that was picked
 	glReadPixels( x,y, 1,1, GL_RGBA, GL_UNSIGNED_BYTE, pixels );
 	
@@ -489,20 +926,35 @@ void npPick (int x, int y, void* dataRef)
 
 		if (node != NULL)
 		{
+			if (node->type != kNodeHUD)
+			{
+				if (node != data->map.currentNode)
+				{
+					//set active and selected node pointers unless in cam mode
+					npSelectNode (node, data);
+
+					//if recordID exists then display it, otherwise use node->id
+					if (node->recordID)
+						sprintf(msg, "picked id: %d   recordID: %d", 
+								node->id, node->recordID);
+					else
+						sprintf(msg, "picked id: %d", node->id);
+					npPostMsg(msg, kNPmsgCtrl, data);
+				}
+				else
+					npSelectNode (node, data);	//zz debug, remove this and test to verify ok
+			}
+			//applies action to nodes including HUD items, pins, cam, etc
 			npPickTool (node, data);
-
-			//set active and selected node pointers unless in cam mode
-			npSelectNode (node, data);
-
-			//if recordID exists then display it, otherwise use node->id
-			if (node->recordID)
-				sprintf(msg, "recordID: %d", node->recordID);
-			else
-				sprintf(msg, "id: %d", node->id);
-			npPostMsg(msg, kNPmsgCtrl, data);
 		}
 		else
 			data->io.gl.pickID = 0;	//if invalid node then set to default camera
+	}
+	else if (data->io.mouse.tool == kNPtoolCreate 
+				&& !data->io.mouse.buttonR
+				&& data->io.mouse.pickMode != kNPmodeCamera)						 //zz-s debug, more testing!
+	{
+		data->io.mouse.createEvent = true; //used to create click, but not drag so cam works
 	}
 
 	data->io.gl.pickPass = false;	//clear the flag to draw normal colors

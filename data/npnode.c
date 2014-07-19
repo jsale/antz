@@ -29,12 +29,12 @@
 #include "../io/npch.h"
 
 
-void InitNodeSurface (NPnodePtr node);
-void InitNodePoints (NPnodePtr node);
-void InitNodePin (NPnodePtr node);
-void InitNodeVideo (NPnodePtr node);
-void InitNodeGrid (NPnodePtr node);
-
+void InitNodeSurface (pNPnode node);
+void InitNodePoints (pNPnode node);
+void InitNodePin (pNPnode node);
+void InitNodeVideo (pNPnode node);
+void InitNodeGrid (pNPnode node);
+void npInitNodeHUD (pNPnode node);
 
 //------------------------------------------------------------------------------
 void npInitNode (void* dataRef)
@@ -60,41 +60,45 @@ void npCloseNode(void* dataRef)
 
 //set the text tag offset based on geometry type
 //------------------------------------------------------------------------------
-void npSetTagOffset (NPnodePtr node)
+void npSetTagOffset (pNPnode node)
 {
 	node->tagOffset.x = 0.0f;
 	node->tagOffset.y = 0.0f;
 	node->tagOffset.z = 0.0f;
 
+	//exit if not a pin
+	if (node->type != kNodePin)
+		return;
+
 	//note the missing 'break' statments allowing a function to fall to the next
 	switch (node->geometry)
 	{
-		case kNPglutWireCube :
-		case kNPglutSolidCube : 
-//			break;
-		case kNPglutWireSphere :
-		case kNPglutSolidSphere :
-
-		case kNPglutWireCone :
-		case kNPglutSolidCone :
+		case kNPgeoCubeWire :
+		case kNPgeoCube : 
+		//	break;
+		case kNPgeoSphereWire :
+		case kNPgeoSphere :
+		//	break;
+		case kNPgeoConeWire :
+		case kNPgeoCone :
 			node->tagOffset.z = 1.0f;
 			break;
-		case kNPglutWireTorus :
-		case kNPglutSolidTorus :
+		case kNPgeoTorusWire :
+		case kNPgeoTorus :
 			node->tagOffset.y = 1.5;
 			break;
-		case kNPglutWireDodecahedron :
-		case kNPglutSolidDodecahedron :
-		case kNPglutWireOctahedron :
-		case kNPglutSolidOctahedron :
-		case kNPglutWireTetrahedron :
-		case kNPglutSolidTetrahedron :
-		case kNPglutWireIcosahedron :
-		case kNPglutSolidIcosahedron :
+		case kNPgeoDodecahedronWire :
+		case kNPgeoDodecahedron :
+		case kNPgeoOctahedronWire :
+		case kNPgeoOctahedron :
+		case kNPgeoTetrahedronWire :
+		case kNPgeoTetrahedron :
+		case kNPgeoIcosahedronWire :
+		case kNPgeoIcosahedron :
 			node->tagOffset.z = 1.0f;
 			break;
-		case kNPprimitiveSolidPin :
-		case kNPprimitiveWirePin :
+		case kNPgeoPin :
+		case kNPgeoPinWire :
 			node->tagOffset.z = 5.5f;
 			break;
 		default : 
@@ -110,16 +114,18 @@ void npSetTagOffset (NPnodePtr node)
 // creates a new node and attaches it as a child of the nodeParent
 // if nodeParent is NULL then creates a root node
 //------------------------------------------------------------------------------
-void*  npNodeNew (int nodeType, NPnodePtr nodeParent, void* dataRef)
+pNPnode npNodeNew (int nodeType, pNPnode nodeParent, void* dataRef)
 {
-	NPnodePtr node = NULL;
-
 	pData data = (pData) dataRef;
+	pNPnode node = NULL;
+
+	char msg[256];
 
 	// check to see if max total nodes hit
 	if (data->map.nodeCount >= kNPnodeMax)
 	{
-		printf ("err 4487 - kNPnodeMax hit, max new nodes hit limit\n");
+		sprintf(msg,"err 4487 - kNPnodeMax hit: %d max", kNPnodeMax);
+		npPostMsg(msg, kNPmsgErr, data);
 		return NULL;
 	}
 
@@ -127,7 +133,8 @@ void*  npNodeNew (int nodeType, NPnodePtr nodeParent, void* dataRef)
 	{
 		if (nodeParent->childCount >= kNPnodeChildMax)
 		{
-			printf ("err 4488 - kNPnodeChildMax hit, cannot create child node\n");
+			sprintf(msg,"kNPnodeChildMax Hit: %d max", kNPnodeChildMax);
+			npPostMsg(msg, kNPmsgWarn, data);
 			return NULL;
 		}
 	}
@@ -135,13 +142,14 @@ void*  npNodeNew (int nodeType, NPnodePtr nodeParent, void* dataRef)
 	{
 		if (data->map.nodeRootCount >= kNPnodeRootMax)
 		{
-			printf ("err 4489 - kNPnodeRootMax - max root nodes hit limit\n");
+			sprintf(msg,"err 4489 - kNPnodeRootMax hit: %d max", kNPnodeRootMax);
+			npPostMsg(msg, kNPmsgErr, data);
 			return NULL;
 		}
 	}
 
 	//allocate memory to create node and init defaults
-	node = (NPnodePtr) malloc (sizeof(NPnode));
+	node = (pNPnode) malloc (sizeof(NPnode));
 	if (data == NULL)
 	{
 		printf ("err 4490 - malloc failed, cannot create node\n");
@@ -230,30 +238,29 @@ void*  npNodeNew (int nodeType, NPnodePtr nodeParent, void* dataRef)
 		case kNodeVideo :	InitNodeVideo (node); break;
 		case kNodeSurface :	InitNodeSurface (node); break;
 		case kNodePoints :	InitNodePoints (node); break;
-		case kNodePin :		
+		case kNodePin :
 			InitNodePin (node);
 			// position node based on branchLevel and sibling count
 			if (node->branchLevel == 0)
 			{
 				// distributes 264 root nodes to fill a 24x12 grid at 15 unit spacing
-				node->translate.x = -15.0f * (float)(data->map.nodeRootCount - 4);
-				if ( data->map.nodeRootCount <= 171 )		// northern hemisphere
-					node->translate.y = 15.0f * ((data->map.nodeRootCount - 4) / 24);
-				else if ( data->map.nodeRootCount <= 315 )	// southern hemisphere
-					node->translate.y = 90.0f - 15.0f * ((data->map.nodeRootCount - 4) / 24);
+				node->translate.x = -15.0f * (float)(data->map.nodeRootCount - 5);
+				if ( data->map.nodeRootCount <= 172 )		// northern hemisphere
+					node->translate.y = 15.0f * ((data->map.nodeRootCount - 5) / 24);
+				else if ( data->map.nodeRootCount <= 316 )	// southern hemisphere
+					node->translate.y = 90.0f - 15.0f * ((data->map.nodeRootCount - 5) / 24);
 				else		// after grid filled place additional nodes on x axis
 					node->translate.y = 0.0f;
 			}
 			else
 			{
-				if ( nodeParent->topo == kNPtopoTorus || nodeParent->topo == kNPtopoPin
-					|| nodeParent->topo == kNPtopoNull)
+				if (   nodeParent->topo == kNPtopoPin 
+					|| nodeParent->topo == kNPtopoRod
+					|| nodeParent->topo == kNPtopoTorus )
 				{
 					node->topo = kNPtopoTorus;
-					node->geometry = kNPglutSolidTorus;		//change geometry too
+					node->geometry = kNPgeoTorus;
 				}
-				else 
-					node->topo = kNPtopoPin;	//node->geometry = kNPprimitiveSolidPin;
 
 				// distributes 266 child nodes to fill a sphere at 15 deg spacing
 				node->translate.x = -15.0f * (float)(nodeParent->childCount - 1);
@@ -277,13 +284,22 @@ void*  npNodeNew (int nodeType, NPnodePtr nodeParent, void* dataRef)
 				node->translate.y += 360.0f;
 
 			break;
+		case kNodeLink :	
+			node->topo = kNPtopoNull;
+			node->geometry = kNPgeoCylinder;
+			break;
+		case kNodeHUD :	
+			npInitNodeHUD (node);
+			break;
 		default : break;
 	}
 
 	//select the new node and make it active
-	if (node->type == kNodePin && node->branchLevel > 0)
-		npSelectNode (node->parent, data);
-	else
+//	if (node->type == kNodePin && node->branchLevel > 0)
+//		npSelectNode (node->parent, data);							//zz-s
+//	else 
+	if (node->type != kNodeHUD && node->type != kNodeDefault
+		&& node->branchLevel == 0)			//zz-s						//zz debug
 		npSelectNode (node, data);
 
 	//creates a map that maps node ID back to a ptr to the node, debug zz
@@ -298,22 +314,93 @@ void*  npNodeNew (int nodeType, NPnodePtr nodeParent, void* dataRef)
 	return (void*)node;
 }
 
+//------------------------------------------------------------------------------
+bool npNodeAttach (pNPnode node, pNPnode parent, void* dataRef)
+{
+	if (parent->childCount >= kNPnodeChildMax)
+	{
+		npPostMsg ("err 2828 - Could not attach node, kNPnodeChildMax limit",
+				kNPmsgErr, dataRef);
+		return false;
+	}
+
+	parent->childIndex = parent->childCount++;
+	parent->child[parent->childIndex] = node;
+
+	return true;
+}
 
 //------------------------------------------------------------------------------
-void npNodeDelete (NPnodePtr node, void* dataRef)
+pNPnode npNodeNewLink (pNPnode linkA, pNPnode linkB, void* dataRef)
 {
-	npNodeRemove (1, node, dataRef);
+	pData data = (pData) dataRef;
+	pNPnode parent = NULL;
+	pNPnode node = NULL;
+
+	bool result = false;
+
+	node = npNodeNew (kNodeLink, linkA, data); 
+	
+	if (node == NULL)
+	{
+		npPostMsg ("err 2838 - Could not create link", kNPmsgErr, dataRef);
+		return NULL;
+	}
+
+	result = npNodeAttach (node, linkB, data);
+	if (!result)
+		return NULL;	//err reported by npNodeAttach
+
+	//parent switched by attach, set back to linkA
+	node->parent = linkA;		//link A is the parent of link node
+
+	node->child[0] = linkB;		//link B is made a child of the link node
+//	node->childCount++;
+
+	return node;
+}
+
+//------------------------------------------------------------------------------
+void npNodeDelete (pNPnode node, void* dataRef)
+{
+	pData data = (pData) dataRef;
+	pNPnode parent = NULL;
+
+	data->io.mouse.linkA = NULL;	//in case of delete while using link tool
+
+	npNodeRemove (true, node, dataRef);	//set 
+
+	if (node->type != kNodeLink && node->parent != NULL)
+	{
+		parent = node->parent;
+
+		if (parent != NULL)	//check if null in case of orphan node
+		{
+			if (parent->childCount <= 0)
+				npSelectNode (parent, data);
+			else if (parent->child[parent->childIndex] != NULL)
+				npSelectNode (parent->child[parent->childIndex], data);
+			else
+				npPostMsg("err 9422 - npNodeRemove child is NULL", kNPmsgErr, data);
+		}
+		else
+			npPostMsg("err 9423 - npNodeRemove parent is NULL", kNPmsgErr, data);
+	}
 }
 
 // removes node from tree and recursively traverses tree to free memory
 //------------------------------------------------------------------------------
-void npNodeRemove (int freeNode, NPnodePtr node, void* dataRef)
+void npNodeRemove (bool freeNode, pNPnode node, void* dataRef)
 {
 	int i = 0;
+	int count = 0;
 	static char msg[128];
 
 	pData data = (pData) dataRef;
-	NPnodePtr parent = NULL;
+	pNPnode parent = NULL;
+	pNPnode child = NULL;													//zz-s
+
+	printf("id: %d\n", node->id);
 
 	if (node == NULL)
 	{
@@ -324,45 +411,43 @@ void npNodeRemove (int freeNode, NPnodePtr node, void* dataRef)
 	//do not remove root null, camera or grid
 	if ( node == data->map.node[kNPnodeRootNull] 
 		|| node == data->map.node[kNPnodeRootCamera]
-		|| node == data->map.node[kNPnodeRootGrid] )
+		|| node == data->map.node[kNPnodeRootGrid] 
+		|| node == data->map.node[kNPnodeRootHUD])							//zz debug
 		{
-			sprintf(msg, "Root id: %d Locked - Delete Disabled", node->id);
+			sprintf(msg, "Root id: %d  type: %d Locked - Delete Disabled",
+					node->type, node->id);
 			npPostMsg(msg, kNPmsgWarn, data);
 			return;
 		}
-	
-	//if deleting then recursive call to free memory of all child nodes
-	if (freeNode)
-		for (i = 0; i < node->childCount; i++)
-			npNodeRemove (freeNode, node->child[i], data);
 
-
-	//if child, remove node from parent data structure
-	if (node->branchLevel > 0)
+	if (node->type == kNodeHUD)												//zz debug
 	{
-		parent = node->parent;
-		
-		if (node->parent != NULL)		//if not orphan node
-		{
-			//remove node ptr from child array compact the gap
-			parent->childCount--;
-			for (i = parent->childIndex; i < parent->childCount; i++)
-				parent->child[i] = parent->child[i+1];
+		sprintf(msg, "err 8553 - HUD id: %d  hudType: %d Locked - Delete Disabled",
+			node->type, node->hudType);
+		npPostMsg(msg, kNPmsgWarn, data);
+		return;
+	}
+	
+	//recursively deletes all child branches, except for link nodes
+	if (freeNode && node->type != kNodeLink)						//zz debug, should be safe to remove kNodeLink exception
+	{
+		//if deleting then recursive call to free memory of all child nodes
+		sprintf(msg, "id: %d   childCount: %d", node->id, node->childCount);	//zz-s
+		npPostMsg (msg, kNPmsgCtrl, dataRef);	
 
-			parent->child[parent->childCount] = NULL;
-
-			if (parent->childIndex >= parent->childCount
-				&& parent->childCount > 0 )
-				parent->childIndex = parent->childCount - 1;
-		}
-		else
+		//extra care required, this is a a complex routine to call recursively
+		count = node->childCount;		//childCount changes during deletion
+		for (i=0; i < count; i++)
 		{
-			sprintf(msg,"err 3464 - id: %d branchLevel: %d parent is NULL\n",
-					node->id, node->branchLevel);
-			npPostMsg(msg, kNPmsgErr, data);
+			child = node->child[0];											//zz-s
+			sprintf(msg, "Delete Child id: %d   parent id: %d", child->id, node->id);
+			npPostMsg (msg, kNPmsgCtrl, dataRef);							//zz-s
+			npNodeRemove (freeNode, node->child[0], data);					//zz debug
 		}
 	}
-	else	//process root node update data map structure
+
+	//if child, remove node from parent data structure
+	if (node->branchLevel == 0)		//process root node update data map structure
 	{
 		//compact the gap by updating root node array, could optimize, zz
 		data->map.nodeRootCount--;	//decrement the nodeRootCount first
@@ -373,42 +458,108 @@ void npNodeRemove (int freeNode, NPnodePtr node, void* dataRef)
 		data->map.node[data->map.nodeRootCount] = NULL;
 
 		//ascert nodeRootIndex is inbounds
-		if (data->map.nodeRootIndex >= data->map.nodeRootCount)
+		if (data->map.nodeRootIndex < kNPnodeRootPin)						//zz debug
+			npSelectNode (data->map.currentCam, data);
+		else if (data->map.nodeRootIndex >= data->map.nodeRootCount)
 			npSelectNode (data->map.node[data->map.nodeRootCount - 1], data);
-	}
 
-	//update selectedGrid activeCam selectedPin...
-	//restore active and selection index, after recursive call
-	if (node->branchLevel == 0)		//must be a pin
-	{
+		//update selectedGrid currentCam selectedPin...
+		//restore active and selection index, after recursive call
 		//if deleting last pin then select camera
-		if (data->map.nodeRootCount <= kNPnodeRootPin)
+		if (data->map.nodeRootCount <= kNPnodeRootPin)						//zz debug
 		{
 			data->map.selectedPinIndex = 0;
 			data->map.selectedPinNode = NULL;
 
 			//select root camera to restore initial state
-			npSelectNode (data->map.node[kNPnodeRootCamera], data);
+			npSelectNode (data->map.currentCam, data);
 		}
 		else
 			npSelectNode (data->map.node[data->map.nodeRootIndex], data);
 	}
-	else if (parent != NULL)	//check if null in case of orphan node
+	else	//child node
 	{
-		if (parent->childCount <= 0)
-			npSelectNode (parent, data);
-		else if (parent->child[parent->childIndex] != NULL)
-			npSelectNode (parent->child[parent->childIndex], data);
+		parent = node->parent;
+		
+		if (node->parent != NULL)		//if not orphan node
+		{
+			//below methods are desinged to work with recursive delete branches
+			//find the childIndex to this node									//zz-s
+			for (i = 0; i < parent->childCount; i++)
+				if (parent->child[i] == node)
+					parent->childIndex = i;
+
+			//remove node ptr from child array compact the gap
+			parent->childCount--;					//zz-s this has to be handled with care with recursive call
+			for (i = parent->childIndex; i < parent->childCount; i++)
+				parent->child[i] = parent->child[i+1];
+
+			//set the left over child ptr to null
+			parent->child[parent->childCount] = NULL;
+
+			//ascert the childIndex is valid
+			if (parent->childCount <= 0)
+				parent->childIndex = 0;
+			else if (parent->childIndex >= parent->childCount)
+				parent->childIndex = parent->childCount - 1;
+
+			//if a link then also need to remove from parent at the B end
+			if (node->type == kNodeLink)
+			{
+				parent = node->child[0];	//link B is a child[0] of the link
+			
+				//methods are desinged to work with recursive delete branches
+
+				//find the childIndex to this node									//zz-s
+				for (i = 0; i < parent->childCount; i++)
+					if (parent->child[i] == node)
+						parent->childIndex = i;
+
+				//remove node ptr from child array compact the gap
+				parent->childCount--;					//zz-s this has to be handled with care with recursive call
+				for (i = parent->childIndex; i < parent->childCount; i++)
+					parent->child[i] = parent->child[i+1];
+
+				//set the left over child ptr to null
+				parent->child[parent->childCount] = NULL;
+
+				//ascert the childIndex is valid
+				if (parent->childCount <= 0)
+					parent->childIndex = 0;
+				else if (parent->childIndex >= parent->childCount)
+					parent->childIndex = parent->childCount - 1;
+			}
+		}
 		else
-			npPostMsg("err 9422 - npNodeRemove child is NULL", kNPmsgErr, data);
-	}
-	else
-		npPostMsg("err 9423 - npNodeRemove parent is NULL", kNPmsgErr, data);
+		{
+			sprintf(msg,"err 3464 - id: %d branchLevel: %d parent is NULL\n",
+					node->id, node->branchLevel);
+			npPostMsg(msg, kNPmsgErr, data);
+		}
+
+/*		if (node->type != kNodeLink)
+		{
+			if (parent != NULL)	//check if null in case of orphan node
+			{
+				if (parent->childCount <= 0)
+					npSelectNode (parent, data);
+				else if (parent->child[parent->childIndex] != NULL)
+					npSelectNode (parent->child[parent->childIndex], data);
+				else
+					npPostMsg("err 9422 - npNodeRemove child is NULL", kNPmsgErr, data);
+			}
+			else
+				npPostMsg("err 9423 - npNodeRemove parent is NULL", kNPmsgErr, data);
+		}
+*/	}
 
 	npChRemoveNode (node, data);	//zz-JJ
 
-	sprintf(msg, "Delete id: %d   Select id: %d", node->id, 
-			data->map.currentNode->id);
+	//update the nodeID map													//zz-s
+	data->map.nodeID[node->id] = NULL;
+
+	sprintf (msg, "Delete id: %d  Select id: %d", node->id, 
+									data->map.currentNode->id );
 	npPostMsg (msg, kNPmsgCtrl, dataRef);
 
 	//will free all node data including child nodes on the tree
@@ -422,7 +573,7 @@ void npNodeRemove (int freeNode, NPnodePtr node, void* dataRef)
 
 
 //------------------------------------------------------------------------------
-void npInitNodeDefault (NPnodePtr node)
+void npInitNodeDefault (pNPnode node)
 {
 	int i = 0;
 
@@ -560,18 +711,28 @@ void npInitNodeDefault (NPnodePtr node)
 
 	// below used for transparency and tags, not needed in CSV or DB file
 	node->tag				= NULL;
-	node->screen.x		= 0.0f;							//MB-LABEL
-	node->screen.y		= 0.0f;
-	node->screen.z		= 0.0f;
+
+	node->screen.x			= 0.0f;							//MB-LABEL
+	node->screen.y			= 0.0f;
+	node->screen.z			= 0.0f;
+
+	node->world.x			= 0.0f;
+	node->world.y			= 0.0f;
+	node->world.z			= 0.0f;
+
 	node->distFromCamera	= 0.0f;							//MB-Transp
+	node->hudType			= 0;
+
+	node->linkFlag			= false;
 }
 
 
 // cameras can be GL scene cameras or real-world cameras
 // video is attached as a daughter of the recNode
 //-----------------------------------------------------------------------------
-void npInitNodeCamera (NPnodePtr node)
+void npInitNodeCamera (pNPnode node)
 {
+	int i = 0;
 	NPcameraPtr data = NULL;
 	
 	//allocate memory for camera data struct if does not already exist
@@ -618,12 +779,15 @@ void npInitNodeCamera (NPnodePtr node)
 	data->exposure		= 0.01f;				//in seconds
 	data->sensorType	= kCameraSensorNull;	//3CCD, Debayer pattern...
 
+	for (i=0; i < 16; i++);
+		data->matrix[i]= 0.0f;
+
 	data->size = sizeof(NPcamera);
 }
 
 
 //-----------------------------------------------------------------------------
-void InitNodeVideo (NPnodePtr node)
+void InitNodeVideo (pNPnode node)
 {
 	NPvideoPtr data = (NPvideoPtr) malloc (sizeof(NPvideo));
 	if (data == NULL)
@@ -668,7 +832,7 @@ void InitNodeVideo (NPnodePtr node)
 
 
 //------------------------------------------------------------------------------
-void InitNodeSurface (NPnodePtr node)
+void InitNodeSurface (pNPnode node)
 {
 	NPsurfacePtr data = (NPsurfacePtr) malloc (sizeof(NPsurface));
 	if (data == NULL)
@@ -696,7 +860,7 @@ void InitNodeSurface (NPnodePtr node)
 
 
 //-----------------------------------------------------------------------------
-void InitNodePoints (NPnodePtr node)
+void InitNodePoints (pNPnode node)
 {
 	NPpointsPtr data = (NPpointsPtr) malloc (sizeof(NPpoints));
 	if (data == NULL)
@@ -722,7 +886,7 @@ void InitNodePoints (NPnodePtr node)
 
 
 //-----------------------------------------------------------------------------
-void InitNodePin (NPnodePtr node)
+void InitNodePin (pNPnode node)
 {
 	NPpinPtr data = (NPpinPtr) malloc (sizeof(NPpin));
 	if (data == NULL)
@@ -735,7 +899,8 @@ void InitNodePin (NPnodePtr node)
 
 
 	node->type			= kNodePin;
-	node->geometry		= kNPprimitiveSolidPin;		//ice-cream cone shape
+	node->topo			= kNPtopoPin;
+	node->geometry		= kNPgeoPin;		//ice-cream cone shape
 
 	data->id			= node->id;
 
@@ -767,7 +932,7 @@ void InitNodePin (NPnodePtr node)
 
 
 //------------------------------------------------------------------------------
-void InitNodeGrid (NPnodePtr node)
+void InitNodeGrid (pNPnode node)
 {
 	NPgridPtr gridData = (NPgridPtr) malloc (sizeof(NPgrid));
 
@@ -805,6 +970,23 @@ void InitNodeGrid (NPnodePtr node)
 	gridData->size			= sizeof(NPgrid);
 }
 
+
+//------------------------------------------------------------------------------
+void npInitNodeHUD (pNPnode node)
+{
+	node->type			= kNodeHUD;
+
+	node->triggerLo.z = false;		//turn off limit
+
+	node->colorIndex	= 15;		//grey
+	node->color.r		= 127;
+	node->color.g		= 127;
+	node->color.b		= 127;
+	node->color.a		= 127;		//opacity is overwridden by npDrawNodeTags()
+
+	node->tagMode = kNPtagModeBoxOutlineHUD;
+}
+
 //------------------------------------------------------------------------------
 int npNewNodeID()				//improve this to re-use nodeID upon delete, debug zz
 {
@@ -821,17 +1003,17 @@ int npNewNodeID()				//improve this to re-use nodeID upon delete, debug zz
 	
 //return the selected camera based on the root camera childIndex
 //------------------------------------------------------------------------------
-NPnodePtr npGetActiveCam (void* dataRef)
+pNPnode npGetActiveCam (void* dataRef)
 {
 	pData data = (pData) dataRef;
 
 	//get the active cam if NULL then handle err by setting it to root cam
-	if (data->map.activeCam == NULL)
+	if (data->map.currentCam == NULL)
 	{
-		data->map.activeCam = data->map.node[kNPnodeRootCamera];
-		npPostMsg ("err 2354 - activeCam is NULL", kNPmsgErr, data);
+		data->map.currentCam = data->map.node[kNPnodeRootCamera];
+		npPostMsg ("err 2354 - currentCam is NULL", kNPmsgErr, data);
 	}
 	
-	return data->map.activeCam;
+	return data->map.currentCam;
 }
 

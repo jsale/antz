@@ -247,6 +247,7 @@ FILE* OpenFileDialog (const char* fileName, int kNPfileDialogOpen, void* dataRef
 	FILE* filePtr = NULL;
 	int h = 0;
 	int pathSize = 0;
+	char msg[kNPmaxPath + 64];
 	
 	OPENFILENAME ofn;			// common dialog box structure
 	char szFile[MAX_PATH];		// buffer for file name
@@ -290,7 +291,14 @@ FILE* OpenFileDialog (const char* fileName, int kNPfileDialogOpen, void* dataRef
 						(HANDLE) NULL);
 	else
 	{
-		printf("File Open Dialog cancelled by user\n");
+		npPostMsg ("File Open Dialog Cancelled", kNPmsgCtrl, dataRef);
+		return NULL;
+	}
+
+	//prevents crash if app exited while dialog is open
+	if (hf == INVALID_HANDLE_VALUE)	
+	{
+		npPostMsg ("err 2794 - File Invalid", kNPmsgErr, dataRef);
 		return NULL;
 	}
 
@@ -299,9 +307,12 @@ FILE* OpenFileDialog (const char* fileName, int kNPfileDialogOpen, void* dataRef
 	filePtr = _fdopen(h, "r");
 
 	if (filePtr != NULL)
-		printf("File Open\n");
-
-	printf("path opened: %s\n", &szFile);
+	{
+		sprintf (msg, "File Open: %s", &szFile);
+		npPostMsg (msg, kNPmsgCtrl, dataRef);
+	}
+	else
+		npPostMsg ("err 2795 - File Pointer is NULL", kNPmsgErr, dataRef);
 
 	return filePtr;
 }

@@ -1,0 +1,593 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 45;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		007917413A8E50140C3E4EE3 /* npnode.c in Sources */ = {isa = PBXBuildFile; fileRef = 635C2F5E4ABC07FD04802174 /* npnode.c */; };
+		008F6C4A770A3E3B1A8205F4 /* npcmd.c in Sources */ = {isa = PBXBuildFile; fileRef = 22D90EAD11F528F23EC522A5 /* npcmd.c */; };
+		02E52A225CFF7E3E2D0823A4 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = 5E3C3EB228A173663E7F3503 /* main.c */; };
+		05E04D15259A25E048892F53 /* OpenGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 07AF1C9103BC418F4423111B /* OpenGL.framework */; };
+		08E50038184E41F76B054236 /* npio.c in Sources */ = {isa = PBXBuildFile; fileRef = 06087FF21A852D7836C40F97 /* npio.c */; };
+		098B446039917AAA611A1041 /* npmap.c in Sources */ = {isa = PBXBuildFile; fileRef = 1B455C9E17765EEC733F4047 /* npmap.c */; };
+		0B0654C306292BEB09B01BE1 /* image_helper.c in Sources */ = {isa = PBXBuildFile; fileRef = 3CA270266FF5495B18091AEA /* image_helper.c */; };
+		12AE77863B6D76BF03A8306F /* nptags.c in Sources */ = {isa = PBXBuildFile; fileRef = 481C330665CC580F74C7720C /* nptags.c */; };
+		14706FC702D923C70F7A14B9 /* npjson.c in Sources */ = {isa = PBXBuildFile; fileRef = 73352C6E03807745595D7330 /* npjson.c */; };
+		15830C3866A8417512EE506D /* npdata.c in Sources */ = {isa = PBXBuildFile; fileRef = 1C1269922231410422240034 /* npdata.c */; };
+		26B61B6B3EED3E24664234A1 /* SOIL.c in Sources */ = {isa = PBXBuildFile; fileRef = 1EB179724DED3F2A16803362 /* SOIL.c */; };
+		2C153A8907BB3D9070EE547E /* npdb.c in Sources */ = {isa = PBXBuildFile; fileRef = 0F4714BC73184CAC62E079BA /* npdb.c */; };
+		30D8428C04F935F172032837 /* npmapfile.c in Sources */ = {isa = PBXBuildFile; fileRef = 1C0E10FF0E6D18BF58EC06BA /* npmapfile.c */; };
+		340824400E6066F01F174A4E /* npauxdb.c in Sources */ = {isa = PBXBuildFile; fileRef = 14B328A862DF57824515003F /* npauxdb.c */; };
+		35254E1E534439F44EC8446D /* npctrl.c in Sources */ = {isa = PBXBuildFile; fileRef = 239E6ECB68120E605C7448C1 /* npctrl.c */; };
+		3ADA12441553D194005202BA /* npmath.c in Sources */ = {isa = PBXBuildFile; fileRef = 3ADA12421553D194005202BA /* npmath.c */; };
+		3B245E153BFE4DFD4B96088C /* nposx.c in Sources */ = {isa = PBXBuildFile; fileRef = 079A3A743857782427161D33 /* nposx.c */; };
+		44A329B744FC18D35B160AB8 /* npengine.c in Sources */ = {isa = PBXBuildFile; fileRef = 37CB77273FA42BD56A901819 /* npengine.c */; };
+		456C3DC84AF06B9324C658D9 /* image_DXT.c in Sources */ = {isa = PBXBuildFile; fileRef = 706E4EB20BC36AD81CB15E45 /* image_DXT.c */; };
+		47D70568792C4C3E7F3057A7 /* nplinux.c in Sources */ = {isa = PBXBuildFile; fileRef = 2CD304D77AC12DCD096B5F58 /* nplinux.c */; };
+		51715974717E199511D96235 /* npcsv.c in Sources */ = {isa = PBXBuildFile; fileRef = 61B0052553CB4FC25B622225 /* npcsv.c */; };
+		5560421F09E00C26494649C4 /* npmysql.c in Sources */ = {isa = PBXBuildFile; fileRef = 0A86133E57794AF66C2C5FD7 /* npmysql.c */; };
+		57152FCA2DAE23511C336E52 /* npgdal.c in Sources */ = {isa = PBXBuildFile; fileRef = 3237445E20E6101243D5573A /* npgdal.c */; };
+		59170D8D29620841019110C8 /* npgldraw.c in Sources */ = {isa = PBXBuildFile; fileRef = 33971B010F9F13C1642B64B9 /* npgldraw.c */; };
+		59F1606522AA733F523467E7 /* npgl.c in Sources */ = {isa = PBXBuildFile; fileRef = 0CF328C817B70A0968A07437 /* npgl.c */; };
+		5A1A74F9417E3AAD59131B41 /* npkey.c in Sources */ = {isa = PBXBuildFile; fileRef = 2583594B0148274809DB4623 /* npkey.c */; };
+		5E8C75971A2734324AF617F3 /* npmsw.c in Sources */ = {isa = PBXBuildFile; fileRef = 444C741322DD096709AE7FBD /* npmsw.c */; };
+		5ED31A8A6ACA1A61743B5035 /* npos.c in Sources */ = {isa = PBXBuildFile; fileRef = 248D375616940EFB0DA568E8 /* npos.c */; };
+		624540053555606B28172FDE /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CA13E7D3E995D6E60FB3921 /* Carbon.framework */; };
+		633D48B25EC6391872343A71 /* npglut.c in Sources */ = {isa = PBXBuildFile; fileRef = 1A8C14DA76F95B204EA36D20 /* npglut.c */; };
+		64A862AD4C4D683C4A7B065A /* nptexmap.c in Sources */ = {isa = PBXBuildFile; fileRef = 6C0F578850C170380DC059D3 /* nptexmap.c */; };
+		69A9579B31415B25194B330A /* npxml.c in Sources */ = {isa = PBXBuildFile; fileRef = 339F4BA14EA547C713F42872 /* npxml.c */; };
+		6B4B0DEF55104A5534E47915 /* npobj.c in Sources */ = {isa = PBXBuildFile; fileRef = 2F8F13CF0760544E74CD45F5 /* npobj.c */; };
+		6BAD664839B3362537FE3F1F /* npkml.c in Sources */ = {isa = PBXBuildFile; fileRef = 08CE4C9D6F6558BB7B2A3B6C /* npkml.c */; };
+		6BBF70AA51F27369234E0511 /* nptest.c in Sources */ = {isa = PBXBuildFile; fileRef = 19A3596B2A223A8B22962A23 /* nptest.c */; };
+		70E625EC38BA59D413E008A7 /* npgeometry.c in Sources */ = {isa = PBXBuildFile; fileRef = 292627C64EDB1EA859460C9A /* npgeometry.c */; };
+		7379244A369F3E547EFD2446 /* stb_image_aug.c in Sources */ = {isa = PBXBuildFile; fileRef = 5F8E09EE74AF34285F514F55 /* stb_image_aug.c */; };
+		744C332909B34D28087562B8 /* npfile.c in Sources */ = {isa = PBXBuildFile; fileRef = 305949E642D276DF4FB243EA /* npfile.c */; };
+		749A545C22B000BB09811165 /* GLUT.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 50FD509112006D3E1D987C04 /* GLUT.framework */; };
+		797031BC52E81BB140F52ED4 /* npch.c in Sources */ = {isa = PBXBuildFile; fileRef = 48D614A65664505D2D6A18F8 /* npch.c */; };
+		7D15116D390256481BB45CAC /* npmouse.c in Sources */ = {isa = PBXBuildFile; fileRef = 672752BD27BD1B133399112E /* npmouse.c */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		00F70C8515395A5E70686BF0 /* image_helper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = image_helper.h; sourceTree = "<group>"; };
+		01C8132C48E40F884FF15A95 /* npglut.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npglut.h; sourceTree = "<group>"; };
+		03454B0E35733C5E59E501B7 /* npctrl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npctrl.h; sourceTree = "<group>"; };
+		04AF13E328AE45602D7D6E52 /* npgdal.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npgdal.h; sourceTree = "<group>"; };
+		05D836AD34454BC57E07365F /* nptexmap.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = nptexmap.h; sourceTree = "<group>"; };
+		06087FF21A852D7836C40F97 /* npio.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npio.c; sourceTree = "<group>"; };
+		079A3A743857782427161D33 /* nposx.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = nposx.c; sourceTree = "<group>"; };
+		07AF1C9103BC418F4423111B /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = /System/Library/Frameworks/OpenGL.framework; sourceTree = "<absolute>"; };
+		08CE4C9D6F6558BB7B2A3B6C /* npkml.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npkml.c; sourceTree = "<group>"; };
+		0A86133E57794AF66C2C5FD7 /* npmysql.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npmysql.c; sourceTree = "<group>"; };
+		0CA13E7D3E995D6E60FB3921 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = /System/Library/Frameworks/Carbon.framework; sourceTree = "<absolute>"; };
+		0CCA575A06E74017453536B6 /* stbi_DDS_aug.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = stbi_DDS_aug.h; sourceTree = "<group>"; };
+		0CF328C817B70A0968A07437 /* npgl.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npgl.c; sourceTree = "<group>"; };
+		0F4714BC73184CAC62E079BA /* npdb.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npdb.c; sourceTree = "<group>"; };
+		11B25D362A5010A21FD76DFF /* npjson.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npjson.h; sourceTree = "<group>"; };
+		11F03CDC32C6094319A875EB /* npobj.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npobj.h; sourceTree = "<group>"; };
+		14B328A862DF57824515003F /* npauxdb.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npauxdb.c; sourceTree = "<group>"; };
+		162509C22CC951DB294F2339 /* stb_image_aug.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = stb_image_aug.h; sourceTree = "<group>"; };
+		19A3596B2A223A8B22962A23 /* nptest.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = nptest.c; sourceTree = "<group>"; };
+		1A8C14DA76F95B204EA36D20 /* npglut.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npglut.c; sourceTree = "<group>"; };
+		1B455C9E17765EEC733F4047 /* npmap.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npmap.c; sourceTree = "<group>"; };
+		1BCC19FC7C6D6B6942D35446 /* freeglut.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = freeglut.h; sourceTree = "<group>"; };
+		1C0E10FF0E6D18BF58EC06BA /* npmapfile.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npmapfile.c; sourceTree = "<group>"; };
+		1C1269922231410422240034 /* npdata.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npdata.c; sourceTree = "<group>"; };
+		1EB179724DED3F2A16803362 /* SOIL.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SOIL.c; sourceTree = "<group>"; };
+		1F416DC54D3C58501B996312 /* stdbool.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = stdbool.h; sourceTree = "<group>"; };
+		22D90EAD11F528F23EC522A5 /* npcmd.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npcmd.c; sourceTree = "<group>"; };
+		235C70536255458A233F2905 /* npmap.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npmap.h; sourceTree = "<group>"; };
+		239E6ECB68120E605C7448C1 /* npctrl.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npctrl.c; sourceTree = "<group>"; };
+		248D375616940EFB0DA568E8 /* npos.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npos.c; sourceTree = "<group>"; };
+		24BE74443428640A0AB10BD5 /* stbi_DDS_aug_c.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = stbi_DDS_aug_c.h; sourceTree = "<group>"; };
+		2583594B0148274809DB4623 /* npkey.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npkey.c; sourceTree = "<group>"; };
+		292627C64EDB1EA859460C9A /* npgeometry.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npgeometry.c; sourceTree = "<group>"; };
+		2AFC448125CB683A78BF70D4 /* npgl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npgl.h; sourceTree = "<group>"; };
+		2CD304D77AC12DCD096B5F58 /* nplinux.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = nplinux.c; sourceTree = "<group>"; };
+		2D075D530EB073EA29B00640 /* npfile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npfile.h; sourceTree = "<group>"; };
+		2F8F13CF0760544E74CD45F5 /* npobj.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npobj.c; sourceTree = "<group>"; };
+		305949E642D276DF4FB243EA /* npfile.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npfile.c; sourceTree = "<group>"; };
+		31283EFD59122DB5605F0F36 /* npkml.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npkml.h; sourceTree = "<group>"; };
+		3237445E20E6101243D5573A /* npgdal.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npgdal.c; sourceTree = "<group>"; };
+		323E1AF01479321F465B0CC4 /* image_DXT.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = image_DXT.h; sourceTree = "<group>"; };
+		32901BAA743904287F88797D /* antz */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = antz; sourceTree = BUILT_PRODUCTS_DIR; };
+		330279F169B23B265706034F /* watchtools.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = watchtools.h; sourceTree = "<group>"; };
+		33971B010F9F13C1642B64B9 /* npgldraw.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npgldraw.c; sourceTree = "<group>"; };
+		339F4BA14EA547C713F42872 /* npxml.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npxml.c; sourceTree = "<group>"; };
+		37CB77273FA42BD56A901819 /* npengine.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npengine.c; sourceTree = "<group>"; };
+		3ADA12421553D194005202BA /* npmath.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = npmath.c; sourceTree = "<group>"; };
+		3ADA12431553D194005202BA /* npmath.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = npmath.h; sourceTree = "<group>"; };
+		3C1C09264EE27E830B294A6C /* npdata.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npdata.h; sourceTree = "<group>"; };
+		3CA270266FF5495B18091AEA /* image_helper.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = image_helper.c; sourceTree = "<group>"; };
+		42FB24E972BB662247160A44 /* npcsv.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npcsv.h; sourceTree = "<group>"; };
+		444C741322DD096709AE7FBD /* npmsw.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npmsw.c; sourceTree = "<group>"; };
+		45C332982E5175ED3DDD0219 /* nptest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = nptest.h; sourceTree = "<group>"; };
+		45E950741B483EA421F237E9 /* npdb.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npdb.h; sourceTree = "<group>"; };
+		481C330665CC580F74C7720C /* nptags.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = nptags.c; sourceTree = "<group>"; };
+		4827228549DD6BF122B8147E /* nplinux.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = nplinux.h; sourceTree = "<group>"; };
+		48371A5150CA107C4B3A0962 /* npgeometry.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npgeometry.h; sourceTree = "<group>"; };
+		48D614A65664505D2D6A18F8 /* npch.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npch.c; sourceTree = "<group>"; };
+		49FF31FC563E14CA0BDE2FC3 /* nposx.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = nposx.h; sourceTree = "<group>"; };
+		4A25442900AB6B5E218F43F6 /* npnode.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npnode.h; sourceTree = "<group>"; };
+		4B7A399646F111044B744801 /* nptags.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = nptags.h; sourceTree = "<group>"; };
+		4CC121EB07A57A1251763971 /* npmouse.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npmouse.h; sourceTree = "<group>"; };
+		50FD509112006D3E1D987C04 /* GLUT.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GLUT.framework; path = /System/Library/Frameworks/GLUT.framework; sourceTree = "<absolute>"; };
+		558E611158480AF96E4A53D1 /* npxml.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npxml.h; sourceTree = "<group>"; };
+		570512FF4E5E3E307A2C6D64 /* freeglut_ext.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = freeglut_ext.h; sourceTree = "<group>"; };
+		57904F940CBC2CEA5F08299A /* npgldraw.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npgldraw.h; sourceTree = "<group>"; };
+		58724C861D3B4D2277781C29 /* glut.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = glut.h; sourceTree = "<group>"; };
+		59315352307776E335B66532 /* freeglut_std.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = freeglut_std.h; sourceTree = "<group>"; };
+		5E3C3EB228A173663E7F3503 /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
+		5F8E09EE74AF34285F514F55 /* stb_image_aug.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = stb_image_aug.c; sourceTree = "<group>"; };
+		61B0052553CB4FC25B622225 /* npcsv.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npcsv.c; sourceTree = "<group>"; };
+		635C2F5E4ABC07FD04802174 /* npnode.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npnode.c; sourceTree = "<group>"; };
+		636F38A17A3A1F470FC84100 /* SOIL.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SOIL.h; sourceTree = "<group>"; };
+		66FE69F011D96CDC73651074 /* npkey.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npkey.h; sourceTree = "<group>"; };
+		672752BD27BD1B133399112E /* npmouse.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npmouse.c; sourceTree = "<group>"; };
+		68C76E9708CA3C80323A3005 /* npmsw.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npmsw.h; sourceTree = "<group>"; };
+		68D83DCC29152C27623D2E31 /* npos.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npos.h; sourceTree = "<group>"; };
+		6AA0591303FC281C6F9013E8 /* npengine.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npengine.h; sourceTree = "<group>"; };
+		6BDA4BD40A307E0244304557 /* npauxdb.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npauxdb.h; sourceTree = "<group>"; };
+		6C0D562F3C610F0A19E865E6 /* npmapfile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npmapfile.h; sourceTree = "<group>"; };
+		6C0F578850C170380DC059D3 /* nptexmap.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = nptexmap.c; sourceTree = "<group>"; };
+		6DE9040A3AD910B63B827CB1 /* npmysql.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npmysql.h; sourceTree = "<group>"; };
+		706E4EB20BC36AD81CB15E45 /* image_DXT.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = image_DXT.c; sourceTree = "<group>"; };
+		73352C6E03807745595D7330 /* npjson.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = npjson.c; sourceTree = "<group>"; };
+		789327CF41805D6B22E66784 /* npcmd.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npcmd.h; sourceTree = "<group>"; };
+		7CA33DDA4EA14F6C6AB4555E /* npch.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npch.h; sourceTree = "<group>"; };
+		7CA7657C4CB946984EC5096B /* npio.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = npio.h; sourceTree = "<group>"; };
+		7E8828EA4D4E5AD63EDB43B3 /* nptypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = nptypes.h; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		4D7140D25B3F3F7320623132 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				05E04D15259A25E048892F53 /* OpenGL.framework in Frameworks */,
+				624540053555606B28172FDE /* Carbon.framework in Frameworks */,
+				749A545C22B000BB09811165 /* GLUT.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		09CC318659E410A61A79370D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				32901BAA743904287F88797D /* antz */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		1CEE083854147A8C07193942 /* msw */ = {
+			isa = PBXGroup;
+			children = (
+				444C741322DD096709AE7FBD /* npmsw.c */,
+				68C76E9708CA3C80323A3005 /* npmsw.h */,
+			);
+			path = msw;
+			sourceTree = "<group>";
+		};
+		1EB037183BB63E3B33675083 /* antz */ = {
+			isa = PBXGroup;
+			children = (
+				7D4427711F5652C524657583 /* ctrl */,
+				4EC043776B452F5A59A17899 /* data */,
+				420F6F6016AF6D071F242521 /* io */,
+				6B8035E1071642A50B240169 /* lib */,
+				5E3C3EB228A173663E7F3503 /* main.c */,
+				239E6ECB68120E605C7448C1 /* npctrl.c */,
+				03454B0E35733C5E59E501B7 /* npctrl.h */,
+				1C1269922231410422240034 /* npdata.c */,
+				3C1C09264EE27E830B294A6C /* npdata.h */,
+				06087FF21A852D7836C40F97 /* npio.c */,
+				7CA7657C4CB946984EC5096B /* npio.h */,
+				791239CF7E530A8007766ECB /* os */,
+				4D4D0BC34723695159167017 /* Frameworks */,
+				09CC318659E410A61A79370D /* Products */,
+			);
+			name = antz;
+			sourceTree = "<group>";
+		};
+		1F7C333E5ED43B257F52723E /* include */ = {
+			isa = PBXGroup;
+			children = (
+				4C044D0B2451526B2A5A33D9 /* GL */,
+			);
+			path = include;
+			sourceTree = "<group>";
+		};
+		2FD6200A0FE6535C40323E5E /* src */ = {
+			isa = PBXGroup;
+			children = (
+				1EB179724DED3F2A16803362 /* SOIL.c */,
+				636F38A17A3A1F470FC84100 /* SOIL.h */,
+				706E4EB20BC36AD81CB15E45 /* image_DXT.c */,
+				323E1AF01479321F465B0CC4 /* image_DXT.h */,
+				3CA270266FF5495B18091AEA /* image_helper.c */,
+				00F70C8515395A5E70686BF0 /* image_helper.h */,
+				5F8E09EE74AF34285F514F55 /* stb_image_aug.c */,
+				162509C22CC951DB294F2339 /* stb_image_aug.h */,
+				0CCA575A06E74017453536B6 /* stbi_DDS_aug.h */,
+				24BE74443428640A0AB10BD5 /* stbi_DDS_aug_c.h */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
+		39C945EF60A43388572D7E1E /* db */ = {
+			isa = PBXGroup;
+			children = (
+				14B328A862DF57824515003F /* npauxdb.c */,
+				6BDA4BD40A307E0244304557 /* npauxdb.h */,
+				0A86133E57794AF66C2C5FD7 /* npmysql.c */,
+				6DE9040A3AD910B63B827CB1 /* npmysql.h */,
+			);
+			path = db;
+			sourceTree = "<group>";
+		};
+		420F6F6016AF6D071F242521 /* io */ = {
+			isa = PBXGroup;
+			children = (
+				39C945EF60A43388572D7E1E /* db */,
+				7E613B97531740A45F8070A8 /* file */,
+				5982264E5BBC2E93433F71E0 /* gl */,
+				48D614A65664505D2D6A18F8 /* npch.c */,
+				7CA33DDA4EA14F6C6AB4555E /* npch.h */,
+				0F4714BC73184CAC62E079BA /* npdb.c */,
+				45E950741B483EA421F237E9 /* npdb.h */,
+				305949E642D276DF4FB243EA /* npfile.c */,
+				2D075D530EB073EA29B00640 /* npfile.h */,
+				0CF328C817B70A0968A07437 /* npgl.c */,
+				2AFC448125CB683A78BF70D4 /* npgl.h */,
+				1A8C14DA76F95B204EA36D20 /* npglut.c */,
+				01C8132C48E40F884FF15A95 /* npglut.h */,
+				2583594B0148274809DB4623 /* npkey.c */,
+				66FE69F011D96CDC73651074 /* npkey.h */,
+				672752BD27BD1B133399112E /* npmouse.c */,
+				4CC121EB07A57A1251763971 /* npmouse.h */,
+				330279F169B23B265706034F /* watchtools.h */,
+			);
+			path = io;
+			sourceTree = "<group>";
+		};
+		4382347B26DC523F438A1FED /* osx */ = {
+			isa = PBXGroup;
+			children = (
+				079A3A743857782427161D33 /* nposx.c */,
+				49FF31FC563E14CA0BDE2FC3 /* nposx.h */,
+			);
+			path = osx;
+			sourceTree = "<group>";
+		};
+		4C044D0B2451526B2A5A33D9 /* GL */ = {
+			isa = PBXGroup;
+			children = (
+				1BCC19FC7C6D6B6942D35446 /* freeglut.h */,
+				570512FF4E5E3E307A2C6D64 /* freeglut_ext.h */,
+				59315352307776E335B66532 /* freeglut_std.h */,
+				58724C861D3B4D2277781C29 /* glut.h */,
+			);
+			path = GL;
+			sourceTree = "<group>";
+		};
+		4D4D0BC34723695159167017 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				07AF1C9103BC418F4423111B /* OpenGL.framework */,
+				0CA13E7D3E995D6E60FB3921 /* Carbon.framework */,
+				50FD509112006D3E1D987C04 /* GLUT.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		4EC043776B452F5A59A17899 /* data */ = {
+			isa = PBXGroup;
+			children = (
+				3ADA12421553D194005202BA /* npmath.c */,
+				3ADA12431553D194005202BA /* npmath.h */,
+				1B455C9E17765EEC733F4047 /* npmap.c */,
+				235C70536255458A233F2905 /* npmap.h */,
+				1C0E10FF0E6D18BF58EC06BA /* npmapfile.c */,
+				6C0D562F3C610F0A19E865E6 /* npmapfile.h */,
+				635C2F5E4ABC07FD04802174 /* npnode.c */,
+				4A25442900AB6B5E218F43F6 /* npnode.h */,
+				7E8828EA4D4E5AD63EDB43B3 /* nptypes.h */,
+				1F416DC54D3C58501B996312 /* stdbool.h */,
+			);
+			path = data;
+			sourceTree = "<group>";
+		};
+		4F0A48744A1B5F0A44E1392C /* freeglut */ = {
+			isa = PBXGroup;
+			children = (
+				1F7C333E5ED43B257F52723E /* include */,
+			);
+			path = freeglut;
+			sourceTree = "<group>";
+		};
+		5982264E5BBC2E93433F71E0 /* gl */ = {
+			isa = PBXGroup;
+			children = (
+				292627C64EDB1EA859460C9A /* npgeometry.c */,
+				48371A5150CA107C4B3A0962 /* npgeometry.h */,
+				33971B010F9F13C1642B64B9 /* npgldraw.c */,
+				57904F940CBC2CEA5F08299A /* npgldraw.h */,
+				481C330665CC580F74C7720C /* nptags.c */,
+				4B7A399646F111044B744801 /* nptags.h */,
+				6C0F578850C170380DC059D3 /* nptexmap.c */,
+				05D836AD34454BC57E07365F /* nptexmap.h */,
+			);
+			path = gl;
+			sourceTree = "<group>";
+		};
+		653067A24CFA3ECD169C711D /* linux */ = {
+			isa = PBXGroup;
+			children = (
+				2CD304D77AC12DCD096B5F58 /* nplinux.c */,
+				4827228549DD6BF122B8147E /* nplinux.h */,
+			);
+			path = linux;
+			sourceTree = "<group>";
+		};
+		6B8035E1071642A50B240169 /* lib */ = {
+			isa = PBXGroup;
+			children = (
+				4F0A48744A1B5F0A44E1392C /* freeglut */,
+				75CA50AC52564A2839530EEC /* soil */,
+			);
+			path = lib;
+			sourceTree = "<group>";
+		};
+		75CA50AC52564A2839530EEC /* soil */ = {
+			isa = PBXGroup;
+			children = (
+				2FD6200A0FE6535C40323E5E /* src */,
+			);
+			path = soil;
+			sourceTree = "<group>";
+		};
+		791239CF7E530A8007766ECB /* os */ = {
+			isa = PBXGroup;
+			children = (
+				653067A24CFA3ECD169C711D /* linux */,
+				1CEE083854147A8C07193942 /* msw */,
+				248D375616940EFB0DA568E8 /* npos.c */,
+				68D83DCC29152C27623D2E31 /* npos.h */,
+				4382347B26DC523F438A1FED /* osx */,
+			);
+			path = os;
+			sourceTree = "<group>";
+		};
+		7D4427711F5652C524657583 /* ctrl */ = {
+			isa = PBXGroup;
+			children = (
+				22D90EAD11F528F23EC522A5 /* npcmd.c */,
+				789327CF41805D6B22E66784 /* npcmd.h */,
+				37CB77273FA42BD56A901819 /* npengine.c */,
+				6AA0591303FC281C6F9013E8 /* npengine.h */,
+				19A3596B2A223A8B22962A23 /* nptest.c */,
+				45C332982E5175ED3DDD0219 /* nptest.h */,
+			);
+			path = ctrl;
+			sourceTree = "<group>";
+		};
+		7E613B97531740A45F8070A8 /* file */ = {
+			isa = PBXGroup;
+			children = (
+				61B0052553CB4FC25B622225 /* npcsv.c */,
+				42FB24E972BB662247160A44 /* npcsv.h */,
+				3237445E20E6101243D5573A /* npgdal.c */,
+				04AF13E328AE45602D7D6E52 /* npgdal.h */,
+				73352C6E03807745595D7330 /* npjson.c */,
+				11B25D362A5010A21FD76DFF /* npjson.h */,
+				08CE4C9D6F6558BB7B2A3B6C /* npkml.c */,
+				31283EFD59122DB5605F0F36 /* npkml.h */,
+				2F8F13CF0760544E74CD45F5 /* npobj.c */,
+				11F03CDC32C6094319A875EB /* npobj.h */,
+				339F4BA14EA547C713F42872 /* npxml.c */,
+				558E611158480AF96E4A53D1 /* npxml.h */,
+			);
+			path = file;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		380164C8218675FD6AB278D7 /* antz */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5C285DEA381527CF0D08273F /* Build configuration list for PBXNativeTarget "antz" */;
+			buildPhases = (
+				581A46531C0A5CBE3E830FE1 /* Resources */,
+				00825B491D9E2FDF72F138F8 /* Sources */,
+				4D7140D25B3F3F7320623132 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = antz;
+			productInstallPath = "$(HOME)/bin";
+			productName = antz;
+			productReference = 32901BAA743904287F88797D /* antz */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		08FB7793FE84155DC02AAC07 /* Project object */ = {
+			isa = PBXProject;
+			buildConfigurationList = 1DEB928908733DD80010E9CD /* Build configuration list for PBXProject "antz" */;
+			compatibilityVersion = "Xcode 3.1";
+			hasScannedForEncodings = 1;
+			knownRegions = (
+				English,
+				Japanese,
+				French,
+				German,
+			);
+			mainGroup = 1EB037183BB63E3B33675083 /* antz */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				380164C8218675FD6AB278D7 /* antz */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		581A46531C0A5CBE3E830FE1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		00825B491D9E2FDF72F138F8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				008F6C4A770A3E3B1A8205F4 /* npcmd.c in Sources */,
+				44A329B744FC18D35B160AB8 /* npengine.c in Sources */,
+				6BBF70AA51F27369234E0511 /* nptest.c in Sources */,
+				098B446039917AAA611A1041 /* npmap.c in Sources */,
+				30D8428C04F935F172032837 /* npmapfile.c in Sources */,
+				007917413A8E50140C3E4EE3 /* npnode.c in Sources */,
+				340824400E6066F01F174A4E /* npauxdb.c in Sources */,
+				5560421F09E00C26494649C4 /* npmysql.c in Sources */,
+				51715974717E199511D96235 /* npcsv.c in Sources */,
+				57152FCA2DAE23511C336E52 /* npgdal.c in Sources */,
+				14706FC702D923C70F7A14B9 /* npjson.c in Sources */,
+				6BAD664839B3362537FE3F1F /* npkml.c in Sources */,
+				6B4B0DEF55104A5534E47915 /* npobj.c in Sources */,
+				69A9579B31415B25194B330A /* npxml.c in Sources */,
+				70E625EC38BA59D413E008A7 /* npgeometry.c in Sources */,
+				59170D8D29620841019110C8 /* npgldraw.c in Sources */,
+				12AE77863B6D76BF03A8306F /* nptags.c in Sources */,
+				64A862AD4C4D683C4A7B065A /* nptexmap.c in Sources */,
+				797031BC52E81BB140F52ED4 /* npch.c in Sources */,
+				2C153A8907BB3D9070EE547E /* npdb.c in Sources */,
+				744C332909B34D28087562B8 /* npfile.c in Sources */,
+				59F1606522AA733F523467E7 /* npgl.c in Sources */,
+				633D48B25EC6391872343A71 /* npglut.c in Sources */,
+				5A1A74F9417E3AAD59131B41 /* npkey.c in Sources */,
+				7D15116D390256481BB45CAC /* npmouse.c in Sources */,
+				26B61B6B3EED3E24664234A1 /* SOIL.c in Sources */,
+				456C3DC84AF06B9324C658D9 /* image_DXT.c in Sources */,
+				0B0654C306292BEB09B01BE1 /* image_helper.c in Sources */,
+				7379244A369F3E547EFD2446 /* stb_image_aug.c in Sources */,
+				02E52A225CFF7E3E2D0823A4 /* main.c in Sources */,
+				35254E1E534439F44EC8446D /* npctrl.c in Sources */,
+				15830C3866A8417512EE506D /* npdata.c in Sources */,
+				08E50038184E41F76B054236 /* npio.c in Sources */,
+				47D70568792C4C3E7F3057A7 /* nplinux.c in Sources */,
+				5E8C75971A2734324AF617F3 /* npmsw.c in Sources */,
+				5ED31A8A6ACA1A61743B5035 /* npos.c in Sources */,
+				3B245E153BFE4DFD4B96088C /* nposx.c in Sources */,
+				3ADA12441553D194005202BA /* npmath.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		142F597341D657943DD56E7D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_MODEL_TUNING = G5;
+				INSTALL_PATH = /usr/local/bin;
+				PRODUCT_NAME = antz;
+			};
+			name = Debug;
+		};
+		373A6DE2496B3B0620636456 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_MODEL_TUNING = G5;
+				INSTALL_PATH = /usr/local/bin;
+				PRODUCT_NAME = antz;
+			};
+			name = Release;
+		};
+		5C327B2171E66C3C088B6F55 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
+				CONFIGURATION_TEMP_DIR = "$(OBJROOT)";
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = c99;
+				GCC_ENABLE_CPP_EXCEPTIONS = YES;
+				GCC_ENABLE_FIX_AND_CONTINUE = YES;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PREPROCESSOR_DEFINITIONS = DEBUG;
+				GCC_VERSION = 4.2;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				OBJROOT = obj/Debug;
+				ONLY_ACTIVE_ARCH = NO;
+				PREBINDING = NO;
+				SDKROOT = macosx10.5;
+				STRINGS_FILE_OUTPUT_ENCODING = "UTF-8";
+			};
+			name = Debug;
+		};
+		618313DF40F73A7E49EC5AEF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
+				CONFIGURATION_TEMP_DIR = "$(OBJROOT)";
+				GCC_C_LANGUAGE_STANDARD = c99;
+				GCC_ENABLE_CPP_EXCEPTIONS = YES;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PREPROCESSOR_DEFINITIONS = NDEBUG;
+				GCC_VERSION = 4.2;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				OBJROOT = obj/Release;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = (
+					"-isysroot",
+					/Developer/SDKs/MacOSX10.5.sdk,
+				);
+				PREBINDING = NO;
+				SDKROOT = macosx10.5;
+				STRINGS_FILE_OUTPUT_ENCODING = "UTF-8";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1DEB928908733DD80010E9CD /* Build configuration list for PBXProject "antz" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5C327B2171E66C3C088B6F55 /* Debug */,
+				618313DF40F73A7E49EC5AEF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5C285DEA381527CF0D08273F /* Build configuration list for PBXNativeTarget "antz" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				142F597341D657943DD56E7D /* Debug */,
+				373A6DE2496B3B0620636456 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 08FB7793FE84155DC02AAC07 /* Project object */;
+}

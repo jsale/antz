@@ -154,7 +154,7 @@ FGAPI void    FGAPIENTRY glutSetMenuData(void* data);
  */
 FGAPI int     FGAPIENTRY glutBitmapHeight( void* font );
 FGAPI GLfloat FGAPIENTRY glutStrokeHeight( void* font );
-FGAPI void    FGAPIENTRY glutBitmapString( void* font, const unsigned char *string );
+FGAPI void    FGAPIENTRY npDrawString( void* font, const unsigned char *string );
 FGAPI void    FGAPIENTRY glutStrokeString( void* font, const unsigned char *string );
 
 /*

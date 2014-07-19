@@ -33,7 +33,7 @@
 
 
 int GetTrackOffset (char** trackScanner, char* propertyName);
-void MapTrackOffset (int trackOffset, NPnodePtr node, char* propertyName, void* dataRef);
+void MapTrackOffset (int trackOffset, pNPnode node, char* propertyName, void* dataRef);
 void CreateTracks (int numberTracks, void *dataRef);
 void SaveHeader (int offset, char* header, void *dataRef);
 int SaveHeaders (char** headers, void *dataRef);
@@ -65,8 +65,11 @@ void MapTrackToIntAttribute (int trackOffset, int* attributeValuePtr, void* data
 {
 	pData data = (pData) dataRef;
 
-	*data->io.ch.intTracks.nodePropertyMemoryNextLocation++ = (void*)attributeValuePtr;
-	data->io.ch.intTracks.propertyTracks[data->io.ch.intTracks.propertyTrackIndex++] = trackOffset;
+	if (data->io.ch.intTracks.propertyTrackIndex < kNPmaxPropertiesMapped) 
+	{
+		*data->io.ch.intTracks.nodePropertyMemoryNextLocation++ = (void*)attributeValuePtr;
+		data->io.ch.intTracks.propertyTracks[data->io.ch.intTracks.propertyTrackIndex++] = trackOffset;
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -74,8 +77,11 @@ void MapTrackToFloatAttribute (int trackOffset, float* attributeValuePtr, void* 
 {
 	pData data = (pData) dataRef;
 
-	*data->io.ch.floatTracks.nodePropertyMemoryNextLocation++ = (void*)attributeValuePtr;
-	data->io.ch.floatTracks.propertyTracks[data->io.ch.floatTracks.propertyTrackIndex++] = trackOffset;
+	if (data->io.ch.floatTracks.propertyTrackIndex < kNPmaxPropertiesMapped) 
+	{
+		*data->io.ch.floatTracks.nodePropertyMemoryNextLocation++ = (void*)attributeValuePtr;
+		data->io.ch.floatTracks.propertyTracks[data->io.ch.floatTracks.propertyTrackIndex++] = trackOffset;
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -83,26 +89,49 @@ void MapTrackToUcharAttribute (int trackOffset, unsigned char* attributeValuePtr
 {
 	pData data = (pData) dataRef;
 
-	*data->io.ch.ucharTracks.nodePropertyMemoryNextLocation++ = (void*)attributeValuePtr;
-	data->io.ch.ucharTracks.propertyTracks[data->io.ch.ucharTracks.propertyTrackIndex++] = trackOffset;
+	if (data->io.ch.ucharTracks.propertyTrackIndex < kNPmaxPropertiesMapped) 
+	{
+		*data->io.ch.ucharTracks.nodePropertyMemoryNextLocation++ = (void*)attributeValuePtr;
+		data->io.ch.ucharTracks.propertyTracks[data->io.ch.ucharTracks.propertyTrackIndex++] = trackOffset;
+	}
 }
 
 //------------------------------------------------------------------------------
-void MapTrackOffset(int trackOffset, NPnodePtr node, char* propertyName, void* dataRef)
+void MapTrackOffset(int trackOffset, pNPnode node, char* propertyName, void* dataRef)
 {
 	pData data = (pData) dataRef;
 
+	//items have been ordered in approximate order of likelihood of use
 	if (strcmp(propertyName, "translate_x") == 0) MapTrackToFloatAttribute (trackOffset, &node->translate.x, data);
 	if (strcmp(propertyName, "translate_y") == 0) MapTrackToFloatAttribute (trackOffset, &node->translate.y, data);
 	if (strcmp(propertyName, "translate_z") == 0) MapTrackToFloatAttribute (trackOffset, &node->translate.z, data);
 	if (strcmp(propertyName, "rotate_x") == 0) MapTrackToFloatAttribute (trackOffset, &node->rotate.x, data);
 	if (strcmp(propertyName, "rotate_y") == 0) MapTrackToFloatAttribute (trackOffset, &node->rotate.y, data);
 	if (strcmp(propertyName, "rotate_z") == 0) MapTrackToFloatAttribute (trackOffset, &node->rotate.z, data);
-
 	if (strcmp(propertyName, "scale_x") == 0) MapTrackToFloatAttribute (trackOffset, &node->scale.x, data);
 	if (strcmp(propertyName, "scale_y") == 0) MapTrackToFloatAttribute (trackOffset, &node->scale.y, data);
 	if (strcmp(propertyName, "scale_z") == 0) MapTrackToFloatAttribute (trackOffset, &node->scale.z, data);
 
+	if (strcmp(propertyName, "geometry") == 0) MapTrackToIntAttribute (trackOffset, &node->geometry, data);
+	if (strcmp(propertyName, "ratio") == 0) MapTrackToFloatAttribute (trackOffset, &node->ratio, data);
+	if (strcmp(propertyName, "topo") == 0) MapTrackToIntAttribute (trackOffset, &node->topo, data);
+	if (strcmp(propertyName, "facet") == 0) MapTrackToIntAttribute (trackOffset, &node->facet, data);
+
+	if (strcmp(propertyName, "color_index") == 0) MapTrackToIntAttribute (trackOffset, &node->colorIndex, data);
+	if (strcmp(propertyName, "color_r") == 0) MapTrackToUcharAttribute (trackOffset, &node->color.r, data);
+	if (strcmp(propertyName, "color_g") == 0) MapTrackToUcharAttribute (trackOffset, &node->color.g, data);
+	if (strcmp(propertyName, "color_b") == 0) MapTrackToUcharAttribute (trackOffset, &node->color.b, data);
+	if (strcmp(propertyName, "color_a") == 0) MapTrackToUcharAttribute (trackOffset, &node->color.a, data);
+	if (strcmp(propertyName, "color_shift") == 0) MapTrackToFloatAttribute (trackOffset, &node->colorShift, data);
+
+	if (strcmp(propertyName, "texture_id") == 0) MapTrackToIntAttribute (trackOffset, &node->textureID, data);
+	if (strcmp(propertyName, "hide") == 0) MapTrackToUcharAttribute (trackOffset, &node->hide, data);
+
+	if (strcmp(propertyName, "tag_mode") == 0) MapTrackToIntAttribute (trackOffset, &node->tagMode, data);
+	if (strcmp(propertyName, "tag_offset_x") == 0) MapTrackToFloatAttribute (trackOffset, &node->tagOffset.x, data);
+	if (strcmp(propertyName, "tag_offset_y") == 0) MapTrackToFloatAttribute (trackOffset, &node->tagOffset.y, data);
+	if (strcmp(propertyName, "tag_offset_z") == 0) MapTrackToFloatAttribute (trackOffset, &node->tagOffset.z, data);
+	
 	if (strcmp(propertyName, "translate_rate_x") == 0) MapTrackToFloatAttribute (trackOffset, &node->translateRate.x, data);
 	if (strcmp(propertyName, "translate_rate_y") == 0) MapTrackToFloatAttribute (trackOffset, &node->translateRate.y, data);
 	if (strcmp(propertyName, "translate_rate_z") == 0) MapTrackToFloatAttribute (trackOffset, &node->translateRate.z, data);
@@ -113,25 +142,24 @@ void MapTrackOffset(int trackOffset, NPnodePtr node, char* propertyName, void* d
 	if (strcmp(propertyName, "scale_rate_y") == 0) MapTrackToFloatAttribute (trackOffset, &node->scaleRate.y, data);
 	if (strcmp(propertyName, "scale_rate_z") == 0) MapTrackToFloatAttribute (trackOffset, &node->scaleRate.z, data);
 
-	if (strcmp(propertyName, "tag_mode") == 0) MapTrackToIntAttribute (trackOffset, &node->tagMode, data);
-	if (strcmp(propertyName, "tag_offset_x") == 0) MapTrackToFloatAttribute (trackOffset, &node->tagOffset.x, data);
-	if (strcmp(propertyName, "tag_offset_y") == 0) MapTrackToFloatAttribute (trackOffset, &node->tagOffset.y, data);
-	if (strcmp(propertyName, "tag_offset_z") == 0) MapTrackToFloatAttribute (trackOffset, &node->tagOffset.z, data);
-
-	if (strcmp(propertyName, "geometry") == 0) MapTrackToIntAttribute (trackOffset, &node->geometry, data);
-	if (strcmp(propertyName, "ratio") == 0) MapTrackToFloatAttribute (trackOffset, &node->ratio, data);
-	if (strcmp(propertyName, "topo") == 0) MapTrackToIntAttribute (trackOffset, &node->topo, data);
-	if (strcmp(propertyName, "facet") == 0) MapTrackToIntAttribute (trackOffset, &node->facet, data);
-
-	if (strcmp(propertyName, "colorIndex") == 0) MapTrackToIntAttribute (trackOffset, &node->colorIndex, data);
-	if (strcmp(propertyName, "color_r") == 0) MapTrackToUcharAttribute (trackOffset, &node->color.r, data);
-	if (strcmp(propertyName, "color_g") == 0) MapTrackToUcharAttribute (trackOffset, &node->color.g, data);
-	if (strcmp(propertyName, "color_b") == 0) MapTrackToUcharAttribute (trackOffset, &node->color.b, data);
-	if (strcmp(propertyName, "color_a") == 0) MapTrackToUcharAttribute (trackOffset, &node->color.a, data);
-
-	if (strcmp(propertyName, "texture_id") == 0) MapTrackToIntAttribute (trackOffset, &node->textureID, data);	//zz-JJ
-	if (strcmp(propertyName, "hide") == 0) MapTrackToUcharAttribute (trackOffset, &node->hide, data);	//zz-JJ
-
+	//below are items that are not likely to be used, but maybe
+	if (strcmp(propertyName, "selected") == 0) MapTrackToIntAttribute (trackOffset, &node->selected, data);
+	if (strcmp(propertyName, "shader") == 0) MapTrackToIntAttribute (trackOffset, &node->shader, data);
+	if (strcmp(propertyName, "average") == 0) MapTrackToIntAttribute (trackOffset, &node->average, data);
+	if (strcmp(propertyName, "interval") == 0) MapTrackToIntAttribute (trackOffset, &node->interval, data);
+	
+	if (strcmp(propertyName, "lineWidth") == 0) MapTrackToFloatAttribute (trackOffset, &node->lineWidth, data);
+	if (strcmp(propertyName, "pointSize") == 0) MapTrackToFloatAttribute (trackOffset, &node->pointSize, data);
+	
+	// may add the below node attributes at some point, but don't see the need
+	//	NPintXYZ	autoZoom;
+	//	NPintXYZ	triggerHi;
+	//	NPintXYZ	triggerLo;
+	//	NPfloatXYZ	setHi;
+	//	NPfloatXYZ	setLo;
+	//	NPfloatXYZ	proximity;
+	//	NPintXYZ	proximityMode;
+	//	NPintXYZ	segments;
 }
 
 //------------------------------------------------------------------------------
@@ -717,7 +745,7 @@ void npDeleteChannel (int channel, void* dataRef)
 // of the track-attrib pairs added to the ptr-ptr list
 // node->chInputID = 0 is the null channel, results in no channel mapping
 //------------------------------------------------------------------------------
-void npChSubscribeNode (NPnodePtr node, void* dataRef)
+void npChSubscribeNode (pNPnode node, void* dataRef)
 {
 	pData data = (pData) dataRef;
 	pNPch ch = &data->io.ch;
@@ -884,7 +912,7 @@ void npChRemoveMemoryReferences (pNPnodePropertyTracks propertyTracks, void* bou
 //then changes the chID and calls npChSubscribeNode to setup the new channel ptrs
 //also called by npNodeDelete()
 //------------------------------------------------------------------------------
-void npChRemoveNode (NPnodePtr node, void* dataRef)
+void npChRemoveNode (pNPnode node, void* dataRef)
 {
 	pData data = (pData) dataRef;
 	pNPch ch = &data->io.ch;
@@ -972,7 +1000,7 @@ void npUpdateCh (void* dataRef)
 	now = clock();
 
 	if (data->io.ch.pause) return;  // nothing to update if we have paused
-	if (now > ch->channelNextDataChangeTime) 
+	if (now > ch->channelNextDataChangeTime)								//zz debug, add more precise timing
 	{
 		//printf("time for update... channelReadIndex %d, channelWriteIndex %d, channelDataSize %d\n", data->io.ch.channelReadIndex, data->io.ch.channelWriteIndex, data->io.ch.channelDataSize);
 		ch->channelNextDataChangeTime += ch->channelSampleRate;
